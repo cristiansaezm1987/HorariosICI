@@ -1030,3 +1030,199 @@ button {
 ::-webkit-scrollbar-thumb:hover {
     background: var(--text-secondary);
 }
+
+/* --- PDF Export Button --- */
+.btn-pdf {
+    background-color: var(--primary-color);
+    color: white;
+    border: 1px solid var(--primary-color);
+    padding: 8px 14px;
+    border-radius: var(--border-radius-md);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: var(--transition-fast);
+}
+
+.btn-pdf:hover {
+    background-color: #b3001a;
+    border-color: #b3001a;
+    transform: translateY(-1px);
+}
+
+/* --- Teacher Clickable Link --- */
+.teacher-link {
+    color: var(--secondary-color);
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    transition: color var(--transition-fast);
+}
+
+.teacher-link:hover {
+    color: var(--primary-color);
+    text-decoration-style: solid;
+}
+
+/* --- Print Styles for PDF Export --- */
+/* --- Docente link style in asignaturas table --- */
+.docente-link {
+    color: var(--secondary-color);
+    text-decoration: none;
+    font-weight: 500;
+    border-bottom: 1px dashed var(--secondary-color);
+    transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+.docente-link:hover {
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+@media print {
+    body {
+        background-color: white !important;
+        color: black !important;
+        font-size: 10pt;
+    }
+    
+    .main-header,
+    .sidebar,
+    .upload-box,
+    .sidebar-filters,
+    .table-header button,
+    .table-filters,
+    .btn-pdf,
+    .search-box,
+    .list-panel,
+    .control-card,
+    #toast-container {
+        display: none !important;
+    }
+    
+    .app-container {
+        margin-top: 0 !important;
+        display: block !important;
+    }
+    
+    .content-area {
+        margin-left: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+    
+    .card {
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    .split-view {
+        display: block !important;
+    }
+    
+    .details-panel {
+        width: 100% !important;
+    }
+    
+    .timetable-container {
+        border: 1px solid #ccc !important;
+        background-color: white !important;
+        padding: 5px !important;
+        margin-top: 10px !important;
+    }
+    
+    .timetable-grid {
+        min-width: 100% !important;
+        gap: 2px !important;
+    }
+    
+    .grid-header {
+        background-color: #0f2b5c !important;
+        color: white !important;
+        border: 1px solid #0f2b5c !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    
+    .grid-cell-hour {
+        border-left: 3px solid #64748b !important;
+        background-color: #f8fafc !important;
+        border: 1px solid #e2e8f0 !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    
+    .grid-cell-day {
+        background-color: white !important;
+        border: 1px solid #e2e8f0 !important;
+    }
+    
+    .schedule-block-card {
+        border: 1px solid #ccc !important;
+        box-shadow: none !important;
+        background-color: #f8fafc !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        page-break-inside: avoid;
+    }
+    
+    .schedule-block-card.type-teo { border-left: 4px solid #da291c !important; background-color: rgba(218, 41, 28, 0.05) !important; }
+    .schedule-block-card.type-lab { border-left: 4px solid #007bff !important; background-color: rgba(0, 123, 255, 0.05) !important; }
+    .schedule-block-card.type-ayu { border-left: 4px solid #2e7d32 !important; background-color: rgba(46, 125, 50, 0.05) !important; }
+    .schedule-block-card.type-apm { border-left: 4px solid #f57c00 !important; background-color: rgba(245, 124, 0, 0.05) !important; }
+    
+    .timetable-card h3 {
+        margin-top: 20px !important;
+        margin-bottom: 10px !important;
+        color: #0f2b5c !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+    
+    /* --- Section-specific print rules ---
+       Only the relevant section is shown; tabs not matching data-print-section are hidden.
+    */
+    body[data-print-section="docente"] .tab-content:not(#tab-docentes),
+    body[data-print-section="nivel"] .tab-content:not(#tab-niveles),
+    body[data-print-section="sala"] .tab-content:not(#tab-salas),
+    body[data-print-section="asignaturas"] .tab-content:not(#tab-asignaturas) {
+        display: none !important;
+    }
+
+    body[data-print-section] .tab-content {
+        display: block !important;
+    }
+    
+    /* Show active tab when no section override */
+    .tab-content {
+        display: none !important;
+    }
+    .tab-content.active {
+        display: block !important;
+    }
+    
+    /* Profile card gets max width in print */
+    .profile-card {
+        page-break-inside: avoid;
+    }
+    
+    .profile-details-grid {
+        grid-template-columns: repeat(3, 1fr) !important;
+    }
+    
+    /* Make table text readable */
+    .data-table th, .data-table td {
+        font-size: 8pt !important;
+        padding: 4px 6px !important;
+    }
+    
+    /* Print: hide filter controls in table header */
+    .table-header {
+        padding-bottom: 0 !important;
+    }
+}

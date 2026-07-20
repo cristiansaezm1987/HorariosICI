@@ -8,9 +8,19 @@ let globalFilters = {
 
 let allDocentes = [];
 let allSalas = [];
+let allAsignaturas = []; // raw data for client-side filtering
 let selectedDocente = null;
 let selectedSala = null;
 let selectedNivel = '';
+
+// Asignaturas filter state
+let asignaturaFilters = {
+    query: '',
+    tipo: '',
+    seccion: '',
+    rol: '',
+    sort: ''
+};
 
 // Standard schedule blocks:
 const SCHEDULE_BLOCKS = [
@@ -189,7 +199,29 @@ function setupEventListeners() {
 
     // Client-side search in lists
     document.getElementById('search-asignatura').addEventListener('input', (e) => {
-        filterAsignaturasTable(e.target.value);
+        asignaturaFilters.query = e.target.value;
+        applyAsignaturaFilters();
+    });
+
+    // Advanced asignatura filters
+    document.getElementById('filter-asignatura-tipo').addEventListener('change', (e) => {
+        asignaturaFilters.tipo = e.target.value;
+        applyAsignaturaFilters();
+    });
+
+    document.getElementById('filter-asignatura-seccion').addEventListener('input', (e) => {
+        asignaturaFilters.seccion = e.target.value;
+        applyAsignaturaFilters();
+    });
+
+    document.getElementById('filter-asignatura-rol').addEventListener('change', (e) => {
+        asignaturaFilters.rol = e.target.value;
+        applyAsignaturaFilters();
+    });
+
+    document.getElementById('sort-asignaturas').addEventListener('change', (e) => {
+        asignaturaFilters.sort = e.target.value;
+        applyAsignaturaFilters();
     });
 
     document.getElementById('search-docente').addEventListener('input', (e) => {
@@ -208,6 +240,20 @@ function setupEventListeners() {
         } else {
             document.getElementById('nivel-schedule-card').style.display = 'none';
         }
+    });
+
+    // PDF export buttons
+    document.getElementById('btn-pdf-asignaturas').addEventListener('click', () => {
+        exportPDF('asignaturas');
+    });
+    document.getElementById('btn-pdf-docente').addEventListener('click', () => {
+        exportPDF('docente');
+    });
+    document.getElementById('btn-pdf-nivel').addEventListener('click', () => {
+        exportPDF('nivel');
+    });
+    document.getElementById('btn-pdf-sala').addEventListener('click', () => {
+        exportPDF('sala');
     });
 }
 
@@ -431,75 +477,122 @@ function loadAsignaturas() {
         .then(res => res.json())
         .then(data => {
             if (data.success && !data.empty) {
-                renderAsignaturasTable(data.asignaturas);
+                allAsignaturas = data.asignaturas;
+                // Reset advanced filters when global filters change
+                asignaturaFilters.query = '';
+                asignaturaFilters.tipo = '';
+                asignaturaFilters.seccion = '';
+                asignaturaFilters.rol = '';
+                asignaturaFilters.sort = '';
+                document.getElementById('search-asignatura').value = '';
+                document.getElementById('filter-asignatura-tipo').value = '';
+                document.getElementById('filter-asignatura-seccion').value = '';
+                document.getElementById('filter-asignatura-rol').value = '';
+                document.getElementById('sort-asignaturas').value = '';
+                applyAsignaturaFilters();
             }
         })
         .catch(err => console.error('Error loading asignaturas:', err));
 }
 
-function renderAsignaturasTable(asignaturas) {
-    const tbody = document.getElementById('tbody-asignaturas');
-    tbody.innerHTML = '';
-    
-    if (asignaturas.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" class="text-center" style="padding:30px; text-align:center;">No se encontraron asignaturas con los filtros seleccionados.</td></tr>';
-        return;
-    }
-    
-    asignaturas.forEach(p => {
-        const hasChildren = p.componentes_hijo && p.componentes_hijo.length > 0;
-        const row = document.createElement('tr');
-        row.className = 'parent-row';
-        row.setAttribute('data-nrc', p.NRC);
-        
-        const typeClass = p.TIPO_HORARIO ? p.TIPO_HORARIO.toLowerCase() : '';
-        const docenteName = p.DOCENTE || 'Sin docente asignado';
-        const expandBtn = hasChildren 
-            ? `<button class="btn-toggle-expand" onclick="toggleAsignaturaChildren('${p.NRC}')"><i class="fa-solid fa-chevron-right"></i></button>`
-            : '';
-            
-        row.innerHTML = `
-            <td>${expandBtn}</td>
-            <td><strong>${p.NRC}</strong></td>
-            <td>${p.MATERIA}${p.CURSO}</td>
-            <td>${p.TITULO}</td>
-            <td>${p.SECCION || '-'}</td>
-            <td>${p.HORAS_TOTALES || '0'} hrs</td>
-            <td><span class="badge-type ${typeClass}">${p.TIPO_HORARIO || 'TEO'}</span></td>
-            <td>${p.CUPO || '0'}</td>
-            <td>${p.INSCRITOS || '0'}</td>
-            <td>${p.DISPONIBLES || '0'}</td>
-            <td>${docenteName}</td>
-        `;
-        tbody.appendChild(row);
-        
-        // Append children rows immediately, but hidden
-        if (hasChildren) {
-            p.componentes_hijo.forEach(c => {
-                const childRow = document.createElement('tr');
-                childRow.className = `child-row child-of-${p.NRC}`;
-                childRow.style.display = 'none'; // Hidden initially
-                
-                const cTypeClass = c.TIPO_HORARIO ? c.TIPO_HORARIO.toLowerCase() : '';
-                const cDocenteName = c.DOCENTE || 'Sin docente asignado';
-                
-                childRow.innerHTML = `
-                    <td></td>
-                    <td>${c.NRC}</td>
-                    <td>${c.MATERIA}${c.CURSO}</td>
-                    <td style="padding-left: 24px;"><i class="fa-solid fa-arrow-turn-up" style="transform: rotate(90deg); margin-right: 8px; color: var(--text-light)"></i> ${c.TITULO} (Hijo de NRC ${p.NRC})</td>
-                    <td>${c.SECCION || '-'}</td>
-                    <td>${c.HORAS_TOTALES || '0'} hrs</td>
-                    <td><span class="badge-type ${cTypeClass}">${c.TIPO_HORARIO || 'AYU'}</span></td>
-                    <td>${c.CUPO || '0'}</td>
-                    <td>${c.INSCRITOS || '0'}</td>
-                    <td>${c.DISPONIBLES || '0'}</td>
-                    <td>${cDocenteName}</td>
-                `;
-                tbody.appendChild(childRow);
-            });
+// Apply all client-side asignatura filters and sorting
+function applyAsignaturaFilters() {
+    const { query, tipo, seccion, rol, sort } = asignaturaFilters;
+    const q = query.toLowerCase().trim();
+    const sec = seccion.toLowerCase().trim();
+
+    // Flatten: collect parents and children based on rol filter
+    let flat = [];
+    allAsignaturas.forEach(p => {
+        const includeParent = rol !== 'hijo';
+        const includeChildren = rol !== 'padre';
+
+        if (includeParent) flat.push({ ...p, _isChild: false, _parentNrc: null });
+        if (includeChildren && p.componentes_hijo) {
+            p.componentes_hijo.forEach(c => flat.push({ ...c, _isChild: true, _parentNrc: p.NRC }));
         }
     });
+
+    // Filter
+    flat = flat.filter(item => {
+        const matchQuery = !q ||
+            (item.TITULO && item.TITULO.toLowerCase().includes(q)) ||
+            (item.NRC && String(item.NRC).includes(q)) ||
+            (item.MATERIA && item.MATERIA.toLowerCase().includes(q)) ||
+            (item.DOCENTE && item.DOCENTE.toLowerCase().includes(q)) ||
+            (item.SECCION && item.SECCION.toLowerCase().includes(q));
+
+        const matchTipo = !tipo || (item.TIPO_HORARIO && item.TIPO_HORARIO === tipo);
+        const matchSeccion = !sec || (item.SECCION && item.SECCION.toLowerCase().includes(sec));
+
+        return matchQuery && matchTipo && matchSeccion;
+    });
+
+    // Sort
+    if (sort === 'nrc') {
+        flat.sort((a, b) => String(a.NRC).localeCompare(String(b.NRC)));
+    } else if (sort === 'titulo') {
+        flat.sort((a, b) => (a.TITULO || '').localeCompare(b.TITULO || ''));
+    } else if (sort === 'docente') {
+        flat.sort((a, b) => (a.DOCENTE || '').localeCompare(b.DOCENTE || ''));
+    } else if (sort === 'inscritos') {
+        flat.sort((a, b) => (b.INSCRITOS || 0) - (a.INSCRITOS || 0));
+    } else if (sort === 'disponibles') {
+        flat.sort((a, b) => (b.DISPONIBLES || 0) - (a.DISPONIBLES || 0));
+    } else if (sort === 'horas') {
+        flat.sort((a, b) => (b.HORAS_TOTALES || 0) - (a.HORAS_TOTALES || 0));
+    }
+
+    renderFlatAsignaturasTable(flat);
+}
+
+function renderFlatAsignaturasTable(items) {
+    const tbody = document.getElementById('tbody-asignaturas');
+    tbody.innerHTML = '';
+
+    if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" style="padding:30px; text-align:center; color:var(--text-secondary);">No se encontraron asignaturas con los filtros seleccionados.</td></tr>';
+        return;
+    }
+
+    items.forEach(item => {
+        const row = document.createElement('tr');
+        const typeClass = item.TIPO_HORARIO ? item.TIPO_HORARIO.toLowerCase() : '';
+        const docenteName = item.DOCENTE || 'Sin docente asignado';
+        const docenteLink = item.DOCENTE
+            ? `<a href="#" class="docente-link" onclick="navigateToDocente('${item.DOCENTE.replace(/'/g, "\\'")}')"><i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.7rem; margin-right:4px;"></i>${item.DOCENTE}</a>`
+            : 'Sin docente asignado';
+
+        let tituloCell;
+        if (item._isChild) {
+            tituloCell = `<td style="padding-left:24px;"><i class="fa-solid fa-arrow-turn-up" style="transform:rotate(90deg); margin-right:8px; color:var(--text-light)"></i>${item.TITULO} <span style="font-size:0.75rem; color:var(--text-secondary);">(comp. NRC ${item._parentNrc})</span></td>`;
+            row.className = 'child-row child-row-flat';
+        } else {
+            tituloCell = `<td><strong>${item.TITULO}</strong></td>`;
+            row.className = 'parent-row';
+        }
+
+        row.innerHTML = `
+            <td></td>
+            <td><strong>${item.NRC}</strong></td>
+            <td>${item.MATERIA || ''}${item.CURSO || ''}</td>
+            ${tituloCell}
+            <td>${item.SECCION || '-'}</td>
+            <td>${item.HORAS_TOTALES || '0'} hrs</td>
+            <td><span class="badge-type ${typeClass}">${item.TIPO_HORARIO || 'TEO'}</span></td>
+            <td>${item.CUPO || '0'}</td>
+            <td>${item.INSCRITOS || '0'}</td>
+            <td>${item.DISPONIBLES || '0'}</td>
+            <td>${docenteLink}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function renderAsignaturasTable(asignaturas) {
+    // Legacy: used on initial load; store and re-apply filters
+    allAsignaturas = asignaturas;
+    applyAsignaturaFilters();
 }
 
 function toggleAsignaturaChildren(parentNrc) {
@@ -518,34 +611,42 @@ function toggleAsignaturaChildren(parentNrc) {
     }
 }
 
-// Client side filtering for table
-function filterAsignaturasTable(query) {
-    const q = query.toLowerCase().trim();
-    const rows = document.querySelectorAll('#tbody-asignaturas tr');
-    
-    if (!q) {
-        // Show only parents, hide all children and reset expand buttons
-        rows.forEach(row => {
-            if (row.classList.contains('parent-row')) {
-                row.style.display = 'table-row';
-                const btn = row.querySelector('.btn-toggle-expand');
-                if (btn) btn.classList.remove('expanded');
-            } else if (row.classList.contains('child-row')) {
-                row.style.display = 'none';
+// Navigate to docentes tab and auto-select a teacher by name
+function navigateToDocente(nombre) {
+    // Switch to docentes tab
+    document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
+    const docenteNavBtn = document.querySelector('.nav-item[data-tab="docentes"]');
+    if (docenteNavBtn) docenteNavBtn.classList.add('active');
+
+    // Mark the target name so selectDocente picks it
+    const targetName = nombre.trim();
+
+    fetch('/api/docentes')
+        .then(res => res.json())
+        .then(data => {
+            if (data.success && !data.empty) {
+                allDocentes = data.docentes;
+                activeTab = 'docentes';
+                hideAllTabContents();
+                const tabEl = document.getElementById('tab-docentes');
+                if (tabEl) tabEl.classList.add('active');
+
+                const match = allDocentes.find(d => d.DOCENTE === targetName) || allDocentes[0];
+                renderDocentesList(allDocentes);
+                selectDocente(match);
+
+                // Highlight correct item in list
+                document.querySelectorAll('#list-docentes .list-item-btn').forEach(btn => {
+                    if (btn.querySelector('.list-item-title')?.textContent === match.DOCENTE) {
+                        btn.classList.add('selected');
+                        btn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    } else {
+                        btn.classList.remove('selected');
+                    }
+                });
             }
-        });
-        return;
-    }
-    
-    // If searching, we display both matching parents AND matching children directly.
-    rows.forEach(row => {
-        const text = row.textContent.toLowerCase();
-        if (text.includes(q)) {
-            row.style.display = 'table-row';
-        } else {
-            row.style.display = 'none';
-        }
-    });
+        })
+        .catch(err => console.error('Error navigating to docente:', err));
 }
 
 // --- TAB 3: DOCENTES ---
@@ -875,5 +976,33 @@ function showToast(message, type = 'info') {
     }, 4000);
 }
 
+// --- PDF EXPORT ---
+function exportPDF(type) {
+    const prevTitle = document.title;
+
+    // Build a descriptive print title
+    if (type === 'docente' && selectedDocente) {
+        document.title = `Horario Docente - ${selectedDocente.DOCENTE}`;
+    } else if (type === 'nivel' && selectedNivel) {
+        document.title = `Horario Nivel ${selectedNivel}`;
+    } else if (type === 'sala' && selectedSala) {
+        document.title = `Disponibilidad Sala ${selectedSala.COD_SALON}`;
+    } else if (type === 'asignaturas') {
+        document.title = 'Listado de Asignaturas';
+    }
+
+    // Mark which section to print
+    document.body.setAttribute('data-print-section', type);
+
+    window.print();
+
+    // Restore after print dialog closes
+    setTimeout(() => {
+        document.title = prevTitle;
+        document.body.removeAttribute('data-print-section');
+    }, 1000);
+}
+
 // Global functions for inline HTML event binding
 window.toggleAsignaturaChildren = toggleAsignaturaChildren;
+window.navigateToDocente = navigateToDocente;
