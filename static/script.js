@@ -249,6 +249,30 @@ function setupEventListeners() {
     document.getElementById('btn-pdf-sala').addEventListener('click', () => {
         exportPDF('sala');
     });
+    
+    // --- DISPLAY OPTIONS LISTENERS ---
+    function toggleDisplayOption(checkboxId, cssClass) {
+        const chk = document.getElementById(checkboxId);
+        if (chk) {
+            chk.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    document.body.classList.remove(cssClass);
+                } else {
+                    document.body.classList.add(cssClass);
+                }
+            });
+        }
+    }
+    
+    toggleDisplayOption('chk-show-subject', 'hide-subject');
+    toggleDisplayOption('chk-show-nrc', 'hide-nrc');
+    toggleDisplayOption('chk-show-time', 'hide-time');
+    toggleDisplayOption('chk-show-sala', 'hide-sala');
+    toggleDisplayOption('chk-show-docente', 'hide-docente');
+    toggleDisplayOption('chk-show-tipo', 'hide-tipo');
+
+    // EXPORT ALL NIVELES PDF
+    document.getElementById('btn-pdf-all-niveles')?.addEventListener('click', exportAllNivelesPDF);
 }
 
 // --- FILE UPLOAD LOGIC ---
@@ -837,6 +861,10 @@ function loadNivelSchedule(nivel) {
         .then(res => res.json())
         .then(data => {
             if (data.success) {
+                const titleEl = document.getElementById('nivel-schedule-title');
+                if (titleEl) {
+                    titleEl.innerHTML = `<i class="fa-solid fa-calendar-days"></i> Horario Nivel ${nivel}`;
+                }
                 document.getElementById('nivel-schedule-card').style.display = 'block';
                 renderTimetable('nivel-timetable', data.schedule, 'nivel');
             }
@@ -981,36 +1009,50 @@ function renderTimetable(containerId, scheduleData, viewType) {
                 
                 matches.forEach(m => {
                     const card = document.createElement('div');
+                    
+                    // Generate color based on subject name
+                    const subjectName = m.TITULO || m.MATERIA || 'General';
+                    let hash = 0;
+                    for (let i = 0; i < subjectName.length; i++) {
+                        hash = subjectName.charCodeAt(i) + ((hash << 5) - hash);
+                    }
+                    const hue = Math.abs(hash % 360);
+                    const bgCol = `hsl(${hue}, 85%, 96%)`;
+                    const borderCol = `hsl(${hue}, 70%, 45%)`;
+                    
                     const typeClass = m.TIPO_HORARIO ? m.TIPO_HORARIO.toLowerCase() : 'teo';
-                    card.className = `schedule-block-card type-${typeClass}`;
+                    
+                    card.className = `schedule-block-card`;
+                    card.style.setProperty('background-color', bgCol, 'important');
+                    card.style.setProperty('border-left-color', borderCol, 'important');
                     
                     // Customize meta displayed in cards based on view type
                     let metaText = '';
                     if (viewType === 'docente') {
                         // Display room and level for the teacher
                         metaText = `
-                            <div class="block-meta"><i class="fa-solid fa-door-open"></i> ${m.COD_SALON}</div>
-                            <div class="block-meta"><i class="fa-solid fa-layer-group"></i> Nivel ${m.NIVEL}</div>
+                            <div class="block-meta meta-sala"><i class="fa-solid fa-door-open"></i> ${m.COD_SALON}</div>
+                            <div class="block-meta meta-nivel"><i class="fa-solid fa-layer-group"></i> Nivel ${m.NIVEL}</div>
                         `;
                     } else if (viewType === 'nivel') {
                         // Display room and teacher for the level
                         metaText = `
-                            <div class="block-meta"><i class="fa-solid fa-door-open"></i> ${m.COD_SALON}</div>
-                            <div class="block-meta" title="${m.DOCENTE}"><i class="fa-solid fa-user-tie"></i> ${m.DOCENTE}</div>
+                            <div class="block-meta meta-sala"><i class="fa-solid fa-door-open"></i> ${m.COD_SALON}</div>
+                            <div class="block-meta meta-docente" title="${m.DOCENTE}"><i class="fa-solid fa-user-tie"></i> ${m.DOCENTE}</div>
                         `;
                     } else if (viewType === 'sala') {
                         // Display teacher and level for the room
                         metaText = `
-                            <div class="block-meta" title="${m.DOCENTE}"><i class="fa-solid fa-user-tie"></i> ${m.DOCENTE}</div>
-                            <div class="block-meta"><i class="fa-solid fa-layer-group"></i> Nivel ${m.NIVEL}</div>
+                            <div class="block-meta meta-docente" title="${m.DOCENTE}"><i class="fa-solid fa-user-tie"></i> ${m.DOCENTE}</div>
+                            <div class="block-meta meta-nivel"><i class="fa-solid fa-layer-group"></i> Nivel ${m.NIVEL}</div>
                         `;
                     }
                     
                     const tipoText = m.TIPO_HORARIO || 'TEO';
                     card.innerHTML = `
-                        <span class="block-subject">${m.TITULO} <span class="block-badge-type ${typeClass}">${tipoText}</span></span>
-                        <span class="block-nrc-sec">${m.MATERIA}${m.CURSO} [Sec. ${m.SECCION}] | NRC ${m.NRC}</span>
-                        <div class="block-meta"><i class="fa-solid fa-clock"></i> ${block.times}</div>
+                        <span class="block-subject meta-subject">${m.TITULO} <span class="block-badge-type meta-tipo ${typeClass}">${tipoText}</span></span>
+                        <span class="block-nrc-sec meta-nrc">${m.MATERIA}${m.CURSO} [Sec. ${m.SECCION}] | NRC ${m.NRC}</span>
+                        <div class="block-meta meta-time"><i class="fa-solid fa-clock"></i> ${block.times}</div>
                         ${metaText}
                     `;
                     dayCell.appendChild(card);
@@ -1231,3 +1273,70 @@ function exportPDF(type) {
 // Global functions for inline HTML event binding
 window.toggleAsignaturaChildren = toggleAsignaturaChildren;
 window.navigateToDocente = navigateToDocente;
+
+// --- EXPORT ALL NIVELES PDF LOGIC ---
+async function exportAllNivelesPDF() {
+    const printContainer = document.getElementById('print-all-niveles');
+    printContainer.innerHTML = '';
+    
+    // Obtain all possible level values from the dropdown
+    const selectNivel = document.getElementById('select-nivel');
+    const options = Array.from(selectNivel.options).map(opt => opt.value).filter(val => val !== '');
+    
+    if (options.length === 0) {
+        showToast('No hay niveles disponibles para exportar', 'error');
+        return;
+    }
+    
+    showToast(`Generando PDF para ${options.length} niveles... por favor espere.`, 'success');
+    
+    for (const nivel of options) {
+        const url = new URL('/api/schedule', window.location.origin);
+        url.searchParams.append('nivel', nivel);
+        if (globalFilters.carrera) url.searchParams.append('carrera', globalFilters.carrera);
+        if (globalFilters.jornada) url.searchParams.append('jornada', globalFilters.jornada);
+        
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            
+            if (data.success) {
+                // Create a page container for this level
+                const pageDiv = document.createElement('div');
+                pageDiv.className = 'nivel-print-page';
+                
+                // Add header title for this level
+                const header = document.createElement('h3');
+                header.innerHTML = `<i class="fa-solid fa-layer-group"></i> Horario Nivel ${nivel}`;
+                header.style.color = '#0f2b5c';
+                header.style.marginBottom = '15px';
+                pageDiv.appendChild(header);
+                
+                // Create a div to act as the timetable container
+                const ttDiv = document.createElement('div');
+                const ttId = `print-timetable-nivel-${nivel.replace(/\s+/g, '-')}`;
+                ttDiv.id = ttId;
+                pageDiv.appendChild(ttDiv);
+                
+                printContainer.appendChild(pageDiv);
+                
+                // Render timetable specifically in this container
+                renderTimetable(ttId, data.schedule, 'nivel');
+            }
+        } catch (err) {
+            console.error(`Error fetching schedule for nivel ${nivel}:`, err);
+        }
+    }
+    
+    // Trigger print dialog scoped to the all-niveles section
+    setTimeout(() => {
+        document.body.setAttribute('data-print-section', 'all-niveles');
+        window.print();
+        
+        // Remove attribute after print dialog closes
+        setTimeout(() => {
+            document.body.removeAttribute('data-print-section');
+            printContainer.innerHTML = ''; // Clean up
+        }, 1000);
+    }, 1500);
+}

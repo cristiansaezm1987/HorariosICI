@@ -370,12 +370,26 @@
                             </select>
                         </div>
                     </div>
+                    <div class="selection-row" style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                        <label style="display: block; margin-bottom: 10px; font-weight: 500;">Opciones de Visualización (Celdas)</label>
+                        <div class="display-options" style="display: flex; gap: 15px; flex-wrap: wrap;">
+                            <label><input type="checkbox" id="chk-show-subject" checked> Asignatura</label>
+                            <label><input type="checkbox" id="chk-show-nrc" checked> NRC y Sección</label>
+                            <label><input type="checkbox" id="chk-show-time" checked> Horario</label>
+                            <label><input type="checkbox" id="chk-show-sala" checked> Sala</label>
+                            <label><input type="checkbox" id="chk-show-docente" checked> Docente</label>
+                            <label><input type="checkbox" id="chk-show-tipo" checked> Tipo (Teoría/Lab)</label>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="card timetable-card mt-4" id="nivel-schedule-card" style="display: none;">
-                    <div class="timetable-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                        <h3><i class="fa-solid fa-calendar-days"></i> Horario de Cursos por Nivel Académico</h3>
-                        <button class="btn-pdf" id="btn-pdf-nivel"><i class="fa-solid fa-file-pdf"></i> Exportar PDF</button>
+                    <div class="timetable-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                        <h3 id="nivel-schedule-title"><i class="fa-solid fa-calendar-days"></i> Horario de Cursos por Nivel Académico</h3>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn-pdf" id="btn-pdf-nivel"><i class="fa-solid fa-file-pdf"></i> Exportar Nivel Actual</button>
+                            <button class="btn-pdf" id="btn-pdf-all-niveles" style="background: var(--secondary-color);"><i class="fa-solid fa-file-pdf"></i> Exportar Todos</button>
+                        </div>
                     </div>
                     <div class="timetable-container" id="nivel-timetable">
                         <!-- Timetable Grid will be generated here -->
@@ -444,6 +458,8 @@
             </section>
         </main>
     </div>
+
+    <div id="print-all-niveles" style="display: none;"></div>
 
     <!-- Notification Toast -->
     <div id="toast-container" class="toast-container"></div>

@@ -1121,6 +1121,14 @@ button {
     border-color: var(--primary-color);
 }
 
+/* --- Display options classes for Nivel Timetable --- */
+.hide-subject .meta-subject { display: none !important; }
+.hide-nrc .meta-nrc { display: none !important; }
+.hide-time .meta-time { display: none !important; }
+.hide-sala .meta-sala { display: none !important; }
+.hide-docente .meta-docente { display: none !important; }
+.hide-tipo .meta-tipo { display: none !important; }
+
 @media print {
     body {
         background-color: white !important;
@@ -1177,7 +1185,7 @@ button {
     
     .timetable-grid {
         min-width: 100% !important;
-        gap: 2px !important;
+        gap: 1px !important;
     }
     
     .grid-header {
@@ -1186,6 +1194,8 @@ button {
         border: 1px solid #0f2b5c !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
+        padding: 4px !important;
+        font-size: 9pt !important;
     }
     
     .grid-cell-hour {
@@ -1194,17 +1204,18 @@ button {
         border: 1px solid #e2e8f0 !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
+        padding: 4px !important;
     }
     
     .grid-cell-day {
         background-color: white !important;
         border: 1px solid #e2e8f0 !important;
-        min-height: 42px !important;
-        padding: 4px !important;
+        min-height: 20px !important;
+        padding: 1px !important;
     }
     
     .grid-cell-hour {
-        padding: 4px !important;
+        padding: 2px !important;
     }
 
     .grid-cell-hour .hour-title {
@@ -1222,20 +1233,22 @@ button {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
         page-break-inside: avoid;
-        padding: 4px 6px !important;
+        padding: 2px !important;
+        font-size: 6.5pt !important;
+        line-height: 1 !important;
     }
     
     .schedule-block-card .block-subject {
-        font-size: 0.7rem !important;
-        line-height: 1.1 !important;
+        font-size: 7pt !important;
+        margin-bottom: 1px !important;
     }
     
     .schedule-block-card .block-nrc-sec {
-        font-size: 0.6rem !important;
+        font-size: 5.5pt !important;
     }
 
     .schedule-block-card .block-meta {
-        font-size: 0.55rem !important;
+        font-size: 5.5pt !important;
         margin-top: 1px !important;
     }
     
@@ -1264,6 +1277,26 @@ button {
 
     body[data-print-section] .tab-content {
         display: block !important;
+    }
+
+    body[data-print-section="all-niveles"] .app-container {
+        display: none !important;
+    }
+
+    body[data-print-section="all-niveles"] #print-all-niveles {
+        display: block !important;
+    }
+
+    .nivel-print-page {
+        page-break-after: always;
+        page-break-inside: avoid;
+        padding-top: 5px;
+        box-sizing: border-box;
+        zoom: 0.62; /* Force scale down to fit 14 blocks on one page */
+    }
+    
+    .nivel-print-page:last-child {
+        page-break-after: auto;
     }
     
     /* Show active tab when no section override */
