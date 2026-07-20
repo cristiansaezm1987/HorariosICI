@@ -1006,8 +1006,9 @@ function renderTimetable(containerId, scheduleData, viewType) {
                         `;
                     }
                     
+                    const tipoText = m.TIPO_HORARIO || 'TEO';
                     card.innerHTML = `
-                        <span class="block-subject">${m.TITULO}</span>
+                        <span class="block-subject">${m.TITULO} <span class="block-badge-type ${typeClass}">${tipoText}</span></span>
                         <span class="block-nrc-sec">${m.MATERIA}${m.CURSO} [Sec. ${m.SECCION}] | NRC ${m.NRC}</span>
                         <div class="block-meta"><i class="fa-solid fa-clock"></i> ${block.times}</div>
                         ${metaText}

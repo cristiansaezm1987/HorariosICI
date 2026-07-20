@@ -935,6 +935,25 @@ button {
     word-break: break-word;
 }
 
+.block-badge-type {
+    display: inline-block;
+    font-size: 0.55rem;
+    font-weight: 800;
+    padding: 1px 4px;
+    border-radius: 3px;
+    margin-left: 4px;
+    text-transform: uppercase;
+    vertical-align: middle;
+    line-height: 1.2;
+}
+
+.block-badge-type.teo { background-color: rgba(218, 41, 28, 0.1); color: var(--primary-color); }
+.block-badge-type.lab { background-color: rgba(0, 123, 255, 0.1); color: var(--accent-color); }
+.block-badge-type.ayu { background-color: rgba(46, 125, 50, 0.1); color: var(--success-color); }
+.block-badge-type.apm { background-color: rgba(245, 124, 0, 0.1); color: var(--warning-color); }
+.block-badge-type.ter { background-color: rgba(156, 89, 209, 0.1); color: #9c59d1; }
+
+
 .block-nrc-sec {
     font-size: 0.65rem;
     color: var(--text-secondary);
