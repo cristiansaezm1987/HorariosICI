@@ -288,6 +288,24 @@ def get_summary():
         """)
         edificios = {row['EDIFICIO']: row['sessions'] for row in cursor.fetchall()}
         
+        # Contracts distribution (unique teachers)
+        cursor.execute("""
+            SELECT TIPO_CONTRATO, COUNT(DISTINCT DOCENTE) as count
+            FROM planificacion
+            WHERE DOCENTE IS NOT NULL AND DOCENTE != '' AND TIPO_CONTRATO IS NOT NULL AND TIPO_CONTRATO != ''
+            GROUP BY TIPO_CONTRATO
+        """)
+        contratos = {row['TIPO_CONTRATO']: row['count'] for row in cursor.fetchall()}
+        
+        # Jerarquias distribution (unique teachers)
+        cursor.execute("""
+            SELECT JERARQUIA, COUNT(DISTINCT DOCENTE) as count
+            FROM planificacion
+            WHERE DOCENTE IS NOT NULL AND DOCENTE != '' AND JERARQUIA IS NOT NULL AND JERARQUIA != ''
+            GROUP BY JERARQUIA
+        """)
+        jerarquias = {row['JERARQUIA']: row['count'] for row in cursor.fetchall()}
+        
         return jsonify({
             'success': True,
             'empty': False,
@@ -304,7 +322,9 @@ def get_summary():
             'horas_por_tipo': horas_por_tipo,
             'nrcs_padre_por_tipo': nrcs_padre_por_tipo,
             'components': components,
-            'edificios': edificios
+            'edificios': edificios,
+            'contratos': contratos,
+            'jerarquias': jerarquias
         })
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500

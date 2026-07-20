@@ -490,6 +490,26 @@ button {
     gap: 20px;
 }
 
+.doc-stats-row {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+/* Chart wrapper: centers canvas and limits height */
+.chart-wrapper {
+    position: relative;
+    width: 100%;
+    max-height: 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 0 4px;
+}
+
+.chart-wrapper canvas {
+    max-height: 260px;
+    width: 100% !important;
+}
+
 /* Dynamic breakdown list styles */
 .breakdown-item {
     display: flex;

@@ -12,6 +12,8 @@ let allAsignaturas = []; // raw data for client-side filtering
 let selectedDocente = null;
 let selectedSala = null;
 let selectedNivel = '';
+// Track Chart.js instances so they can be destroyed on re-render
+let chartInstances = {};
 
 // Asignaturas filter state
 let asignaturaFilters = {
@@ -523,6 +525,22 @@ function loadDashboard() {
                     bldgList.appendChild(item);
                 });
 
+                // --- Panel 4: Contratos (Doughnut Chart) ---
+                renderDoughnutChart(
+                    'chart-contratos',
+                    data.contratos || {},
+                    [
+                        '#0f2b5c', '#da291c', '#3a7fc1', '#e57c35',
+                        '#4caf7d', '#9c59d1', '#64748b', '#f0a500'
+                    ]
+                );
+
+                // --- Panel 5: Jerarquías (Horizontal Bar Chart) ---
+                renderBarChart(
+                    'chart-jerarquias',
+                    data.jerarquias || {}
+                );
+
             }
         })
         .catch(err => console.error('Error loading dashboard summary:', err));
@@ -1004,6 +1022,148 @@ function renderTimetable(containerId, scheduleData, viewType) {
     });
     
     container.appendChild(grid);
+}
+
+// --- CHART HELPERS ---
+function renderDoughnutChart(canvasId, dataObj, colors) {
+    // Destroy previous instance if exists
+    if (chartInstances[canvasId]) {
+        chartInstances[canvasId].destroy();
+        delete chartInstances[canvasId];
+    }
+
+    const labels = Object.keys(dataObj);
+    const values = Object.values(dataObj);
+    if (labels.length === 0) return;
+
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+
+    chartInstances[canvasId] = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels,
+            datasets: [{
+                data: values,
+                backgroundColor: colors || [
+                    '#0f2b5c', '#da291c', '#3a7fc1', '#e57c35',
+                    '#4caf7d', '#9c59d1', '#64748b', '#f0a500'
+                ],
+                borderColor: '#ffffff',
+                borderWidth: 3,
+                hoverOffset: 10
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            cutout: '62%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        font: { family: 'Inter', size: 12 },
+                        color: '#1e293b',
+                        padding: 14,
+                        usePointStyle: true,
+                        pointStyleWidth: 10,
+                        generateLabels(chart) {
+                            const data = chart.data;
+                            const total = data.datasets[0].data.reduce((s, v) => s + v, 0);
+                            return data.labels.map((label, i) => ({
+                                text: `${label}  (${data.datasets[0].data[i]})`,
+                                fillStyle: data.datasets[0].backgroundColor[i],
+                                strokeStyle: data.datasets[0].backgroundColor[i],
+                                index: i
+                            }));
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label(ctx) {
+                            const total = ctx.dataset.data.reduce((s, v) => s + v, 0);
+                            const pct = total > 0 ? Math.round((ctx.parsed / total) * 100) : 0;
+                            return ` ${ctx.label}: ${ctx.parsed} docentes (${pct}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderBarChart(canvasId, dataObj) {
+    // Destroy previous instance if exists
+    if (chartInstances[canvasId]) {
+        chartInstances[canvasId].destroy();
+        delete chartInstances[canvasId];
+    }
+
+    // Sort descending
+    const sorted = Object.entries(dataObj).sort((a, b) => b[1] - a[1]);
+    const labels = sorted.map(([k]) => k);
+    const values = sorted.map(([, v]) => v);
+    if (labels.length === 0) return;
+
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+
+    // Generate a gradient from navy to red
+    const bgColors = labels.map((_, i) => {
+        const ratio = labels.length > 1 ? i / (labels.length - 1) : 0;
+        const r = Math.round(15 + ratio * (218 - 15));
+        const g = Math.round(43 + ratio * (41 - 43));
+        const b = Math.round(92 + ratio * (28 - 92));
+        return `rgba(${r},${g},${b},0.85)`;
+    });
+
+    chartInstances[canvasId] = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Docentes',
+                data: values,
+                backgroundColor: bgColors,
+                borderRadius: 6,
+                borderSkipped: false
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label(ctx) {
+                            return ` ${ctx.parsed.x} docente${ctx.parsed.x !== 1 ? 's' : ''}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1,
+                        font: { family: 'Inter', size: 11 },
+                        color: '#64748b'
+                    },
+                    grid: { color: '#f1f5f9' }
+                },
+                y: {
+                    ticks: {
+                        font: { family: 'Inter', size: 11 },
+                        color: '#1e293b'
+                    },
+                    grid: { display: false }
+                }
+            }
+        }
+    });
 }
 
 // --- TOAST NOTIFICATIONS ---

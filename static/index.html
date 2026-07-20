@@ -9,6 +9,8 @@
     <!-- FontAwesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
+    <!-- Chart.js for charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <!-- Top Corporate Header -->
@@ -181,6 +183,27 @@
                             <p class="panel-subtitle">Distribución del uso de infraestructura universitaria</p>
                             <div class="building-list" id="building-breakdown-list">
                                 <!-- Dynamic building items -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- New Row: Docente statistics charts -->
+                    <div class="dashboard-details-row doc-stats-row">
+                        <!-- Chart Card 1: Tipos de Contrato -->
+                        <div class="card panel-card">
+                            <h3><i class="fa-solid fa-file-contract"></i> Distribución de Contratos</h3>
+                            <p class="panel-subtitle">Desglose de docentes por tipo de contrato</p>
+                            <div class="chart-wrapper">
+                                <canvas id="chart-contratos"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Chart Card 2: Jerarquía Académica -->
+                        <div class="card panel-card">
+                            <h3><i class="fa-solid fa-graduation-cap"></i> Jerarquía Académica</h3>
+                            <p class="panel-subtitle">Distribución de docentes por jerarquía o cargo</p>
+                            <div class="chart-wrapper">
+                                <canvas id="chart-jerarquias"></canvas>
                             </div>
                         </div>
                     </div>
