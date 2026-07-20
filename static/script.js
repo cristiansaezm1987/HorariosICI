@@ -1009,7 +1009,7 @@ function renderTimetable(containerId, scheduleData, viewType) {
                     card.innerHTML = `
                         <span class="block-subject">${m.TITULO}</span>
                         <span class="block-nrc-sec">${m.MATERIA}${m.CURSO} [Sec. ${m.SECCION}] | NRC ${m.NRC}</span>
-                        <div class="block-meta"><i class="fa-solid fa-clock"></i> ${m.hora_inicio_fmt} - ${m.hora_fin_fmt}</div>
+                        <div class="block-meta"><i class="fa-solid fa-clock"></i> ${block.times}</div>
                         ${metaText}
                     `;
                     dayCell.appendChild(card);
