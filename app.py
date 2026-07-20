@@ -380,6 +380,9 @@ def get_summary():
 
 @app.route('/api/filters', methods=['GET'])
 def get_filters():
+    carrera = request.args.get('carrera')
+    jornada = request.args.get('jornada')
+    
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -391,20 +394,34 @@ def get_filters():
         cursor.execute("SELECT DISTINCT CARRERA FROM planificacion WHERE CARRERA IS NOT NULL ORDER BY CARRERA")
         carreras = [r['CARRERA'] for r in cursor.fetchall()]
         
-        cursor.execute("SELECT DISTINCT NIVEL FROM planificacion WHERE NIVEL IS NOT NULL ORDER BY NIVEL")
+        # Helper for conditions
+        base_cond = []
+        base_params = []
+        if carrera:
+            base_cond.append("CARRERA = ?")
+            base_params.append(carrera)
+        if jornada:
+            base_cond.append("JORNADA = ?")
+            base_params.append(jornada)
+            
+        where_clause = ""
+        if base_cond:
+            where_clause = "AND " + " AND ".join(base_cond)
+            
+        cursor.execute(f"SELECT DISTINCT NIVEL FROM planificacion WHERE NIVEL IS NOT NULL {where_clause} ORDER BY NIVEL", base_params)
         niveles = [r['NIVEL'] for r in cursor.fetchall()]
         
         # Fetch the maximum number of primary sections any course has in each Nivel
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT NIVEL, MAX(num_sections) as max_secciones
             FROM (
                 SELECT NIVEL, MATERIA, CURSO, CARRERA, COUNT(DISTINCT NRC) as num_sections
                 FROM planificacion
-                WHERE NIVEL IS NOT NULL AND (NRC_PADRE IS NULL OR NRC_PADRE = '')
+                WHERE NIVEL IS NOT NULL AND (NRC_PADRE IS NULL OR NRC_PADRE = '') {where_clause}
                 GROUP BY NIVEL, MATERIA, CURSO, CARRERA
             )
             GROUP BY NIVEL
-        """)
+        """, base_params)
         niveles_secciones = []
         for r in cursor.fetchall():
             nivel = r['NIVEL']
@@ -413,16 +430,16 @@ def get_filters():
                 for i in range(1, max_sec + 1):
                     niveles_secciones.append({'nivel': nivel, 'seccion': str(i)})
         
-        cursor.execute("SELECT DISTINCT DOCENTE FROM planificacion WHERE DOCENTE IS NOT NULL AND DOCENTE != '' ORDER BY DOCENTE")
+        cursor.execute(f"SELECT DISTINCT DOCENTE FROM planificacion WHERE DOCENTE IS NOT NULL AND DOCENTE != '' {where_clause} ORDER BY DOCENTE", base_params)
         docentes = [r['DOCENTE'] for r in cursor.fetchall()]
         
-        cursor.execute("SELECT DISTINCT COD_SALON, SALON FROM planificacion WHERE COD_SALON IS NOT NULL AND COD_SALON != '' ORDER BY COD_SALON")
+        cursor.execute(f"SELECT DISTINCT COD_SALON, SALON FROM planificacion WHERE COD_SALON IS NOT NULL AND COD_SALON != '' {where_clause} ORDER BY COD_SALON", base_params)
         salas = [{'cod': r['COD_SALON'], 'name': f"{r['COD_SALON']} - {r['SALON']}"} for r in cursor.fetchall()]
         
-        cursor.execute("SELECT DISTINCT EDIFICIO FROM planificacion WHERE EDIFICIO IS NOT NULL AND EDIFICIO != '' ORDER BY EDIFICIO")
+        cursor.execute(f"SELECT DISTINCT EDIFICIO FROM planificacion WHERE EDIFICIO IS NOT NULL AND EDIFICIO != '' {where_clause} ORDER BY EDIFICIO", base_params)
         edificios = [r['EDIFICIO'] for r in cursor.fetchall()]
         
-        cursor.execute("SELECT DISTINCT CODIGO_PROGRAMA FROM planificacion WHERE CODIGO_PROGRAMA IS NOT NULL ORDER BY CODIGO_PROGRAMA")
+        cursor.execute(f"SELECT DISTINCT CODIGO_PROGRAMA FROM planificacion WHERE CODIGO_PROGRAMA IS NOT NULL {where_clause} ORDER BY CODIGO_PROGRAMA", base_params)
         programas = [r['CODIGO_PROGRAMA'] for r in cursor.fetchall()]
         
         cursor.execute("SELECT DISTINCT JORNADA FROM planificacion WHERE JORNADA IS NOT NULL ORDER BY JORNADA")

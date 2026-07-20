@@ -282,34 +282,42 @@ function setupEventListeners() {
 
     overlayCarreraSelect.addEventListener('change', (e) => {
         const selected = e.target.value;
-        overlayNivelSelect.innerHTML = '<option value="">-- Seleccionar Nivel --</option>';
-        if (selected && allFiltersData) {
-            overlayNivelSelect.disabled = false;
-            // Note: Since allFiltersData.niveles applies globally, we can just populate it 
-            // the same way we do for the main filter
-            if (allFiltersData.niveles && allFiltersData.niveles_secciones) {
-                allFiltersData.niveles.forEach(n => {
-                    const optGroup = document.createElement('option');
-                    optGroup.value = n;
-                    optGroup.textContent = `Nivel ${n} (Todas las Secciones)`;
-                    optGroup.style.fontWeight = 'bold';
-                    overlayNivelSelect.appendChild(optGroup);
-                    
-                    const sectionsForLevel = allFiltersData.niveles_secciones.filter(ns => ns.nivel === n);
-                    if (sectionsForLevel.length > 1) {
-                        sectionsForLevel.forEach(ns => {
-                            const opt = document.createElement('option');
-                            opt.value = `${n}|${ns.seccion}`;
-                            opt.innerHTML = `&nbsp;&nbsp;&nbsp;↳ Nivel ${n} - Grupo ${ns.seccion}`;
-                            overlayNivelSelect.appendChild(opt);
+        overlayNivelSelect.innerHTML = '<option value="">Cargando...</option>';
+        overlayNivelSelect.disabled = true;
+        btnConfirmOverlay.disabled = true;
+        
+        if (selected) {
+            fetch(`/api/filters?carrera=${encodeURIComponent(selected)}`)
+                .then(res => res.json())
+                .then(data => {
+                    overlayNivelSelect.innerHTML = '<option value="">-- Seleccionar Nivel --</option>';
+                    if (data.success && data.niveles && data.niveles_secciones) {
+                        overlayNivelSelect.disabled = false;
+                        data.niveles.forEach(n => {
+                            const optGroup = document.createElement('option');
+                            optGroup.value = n;
+                            optGroup.textContent = `Nivel ${n} (Todas las Secciones)`;
+                            optGroup.style.fontWeight = 'bold';
+                            overlayNivelSelect.appendChild(optGroup);
+                            
+                            const sectionsForLevel = data.niveles_secciones.filter(ns => ns.nivel === n);
+                            if (sectionsForLevel.length > 1) {
+                                sectionsForLevel.forEach(ns => {
+                                    const opt = document.createElement('option');
+                                    opt.value = `${n}|${ns.seccion}`;
+                                    opt.innerHTML = `&nbsp;&nbsp;&nbsp;↳ Nivel ${n} - Grupo ${ns.seccion}`;
+                                    overlayNivelSelect.appendChild(opt);
+                                });
+                            }
                         });
                     }
+                })
+                .catch(err => {
+                    console.error('Error fetching overlay filters:', err);
+                    overlayNivelSelect.innerHTML = '<option value="">-- Error --</option>';
                 });
-            }
-            btnConfirmOverlay.disabled = true; // Wait for Nivel selection
         } else {
-            overlayNivelSelect.disabled = true;
-            btnConfirmOverlay.disabled = true;
+            overlayNivelSelect.innerHTML = '<option value="">-- Seleccionar Carrera Primero --</option>';
         }
     });
 
@@ -490,7 +498,11 @@ function refreshActiveTab() {
 
 // --- POPULATE SELECT FILTERS ---
 function loadGlobalFilters() {
-    fetch('/api/filters')
+    const url = new URL('/api/filters', window.location.origin);
+    if (globalFilters.carrera) url.searchParams.append('carrera', globalFilters.carrera);
+    if (globalFilters.jornada) url.searchParams.append('jornada', globalFilters.jornada);
+    
+    fetch(url)
         .then(res => res.json())
         .then(data => {
             if (data.success) {
