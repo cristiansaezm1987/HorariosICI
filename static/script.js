@@ -18,7 +18,6 @@ let asignaturaFilters = {
     query: '',
     tipo: '',
     seccion: '',
-    rol: '',
     sort: ''
 };
 
@@ -211,11 +210,6 @@ function setupEventListeners() {
 
     document.getElementById('filter-asignatura-seccion').addEventListener('input', (e) => {
         asignaturaFilters.seccion = e.target.value;
-        applyAsignaturaFilters();
-    });
-
-    document.getElementById('filter-asignatura-rol').addEventListener('change', (e) => {
-        asignaturaFilters.rol = e.target.value;
         applyAsignaturaFilters();
     });
 
@@ -414,38 +408,104 @@ function loadDashboard() {
                 document.getElementById('matricula-percentage').textContent = `${percent}% de ocupación de cupos`;
                 document.getElementById('matricula-progress-fill').style.width = `${percent}%`;
 
-                // Render component type breakdown
-                const compList = document.getElementById('component-breakdown-list');
-                compList.innerHTML = '';
-                
                 const typeNames = {
                     'TEO': 'Teoría / Cátedra',
                     'AYU': 'Ayudantía',
                     'LAB': 'Laboratorio',
-                    'APM': 'Autoaprendizaje / Plataforma',
                     'TER': 'Terreno'
                 };
-                
-                // Sort breakdown items descending by count
-                const sortedComponents = Object.entries(data.components).sort((a,b) => b[1] - a[1]);
-                sortedComponents.forEach(([type, count]) => {
+
+                // --- Panel 1: Horas por tipo ---
+                const horasList = document.getElementById('horas-por-tipo-list');
+                horasList.innerHTML = '';
+
+                // Order: TEO, LAB, AYU, TER, others
+                const tipoOrder = ['TEO', 'LAB', 'AYU', 'TER'];
+                const horasEntries = Object.entries(data.horas_por_tipo || {})
+                    .filter(([t]) => t !== 'APM')
+                    .sort((a, b) => {
+                        const ia = tipoOrder.indexOf(a[0]);
+                        const ib = tipoOrder.indexOf(b[0]);
+                        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+                    });
+
+                const totalHorasTipos = horasEntries.reduce((s, [, h]) => s + h, 0);
+
+                horasEntries.forEach(([type, horas]) => {
                     const item = document.createElement('div');
                     item.className = 'breakdown-item';
-                    
                     const name = typeNames[type] || type;
-                    const badgeClass = type.toLowerCase();
-                    
+                    const pct = totalHorasTipos > 0 ? Math.round((horas / totalHorasTipos) * 100) : 0;
                     item.innerHTML = `
-                        <div class="breakdown-info">
-                            <span class="breakdown-tag badge-type ${badgeClass}">${type}</span>
+                        <div class="breakdown-info" style="flex:1; min-width:0;">
+                            <span class="breakdown-tag badge-type ${type.toLowerCase()}">${type}</span>
                             <span class="breakdown-name">${name}</span>
                         </div>
-                        <span class="breakdown-stats">${count} secciones</span>
+                        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:2px; min-width:90px;">
+                            <span class="breakdown-stats"><strong>${horas}</strong> hrs</span>
+                            <div style="width:80px; height:4px; background:#e2e8f0; border-radius:2px; overflow:hidden;">
+                                <div style="width:${pct}%; height:100%; background:var(--secondary-color); border-radius:2px;"></div>
+                            </div>
+                        </div>
                     `;
-                    compList.appendChild(item);
+                    horasList.appendChild(item);
                 });
 
-                // Render building breakdown
+                // Total row
+                const totalRowH = document.createElement('div');
+                totalRowH.className = 'breakdown-item';
+                totalRowH.style.cssText = 'border-top: 2px solid var(--border-color); margin-top:6px; padding-top:8px; font-weight:600;';
+                totalRowH.innerHTML = `
+                    <div class="breakdown-info"><span class="breakdown-name">Total horas semanales</span></div>
+                    <span class="breakdown-stats"><strong>${totalHorasTipos}</strong> hrs</span>
+                `;
+                horasList.appendChild(totalRowH);
+
+                // --- Panel 2: NRCs padre por tipo ---
+                const nrcsList = document.getElementById('nrcs-padre-por-tipo-list');
+                nrcsList.innerHTML = '';
+
+                const nrcsEntries = Object.entries(data.nrcs_padre_por_tipo || {})
+                    .filter(([t]) => t !== 'APM')
+                    .sort((a, b) => {
+                        const ia = tipoOrder.indexOf(a[0]);
+                        const ib = tipoOrder.indexOf(b[0]);
+                        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+                    });
+
+                const totalNrcsPadre = nrcsEntries.reduce((s, [, n]) => s + n, 0);
+
+                nrcsEntries.forEach(([type, n]) => {
+                    const item = document.createElement('div');
+                    item.className = 'breakdown-item';
+                    const name = typeNames[type] || type;
+                    const pct = totalNrcsPadre > 0 ? Math.round((n / totalNrcsPadre) * 100) : 0;
+                    item.innerHTML = `
+                        <div class="breakdown-info" style="flex:1; min-width:0;">
+                            <span class="breakdown-tag badge-type ${type.toLowerCase()}">${type}</span>
+                            <span class="breakdown-name">${name}</span>
+                        </div>
+                        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:2px; min-width:90px;">
+                            <span class="breakdown-stats"><strong>${n}</strong> NRCs</span>
+                            <div style="width:80px; height:4px; background:#e2e8f0; border-radius:2px; overflow:hidden;">
+                                <div style="width:${pct}%; height:100%; background:var(--primary-color); border-radius:2px;"></div>
+                            </div>
+                        </div>
+                    `;
+                    nrcsList.appendChild(item);
+                });
+
+                // Total row
+                const totalRowN = document.createElement('div');
+                totalRowN.className = 'breakdown-item';
+                totalRowN.style.cssText = 'border-top: 2px solid var(--border-color); margin-top:6px; padding-top:8px; font-weight:600;';
+                totalRowN.innerHTML = `
+                    <div class="breakdown-info"><span class="breakdown-name">Total asignaturas (NRC padre)</span></div>
+                    <span class="breakdown-stats"><strong>${totalNrcsPadre}</strong> NRCs</span>
+                `;
+                nrcsList.appendChild(totalRowN);
+
+                // --- Panel 3: Edificios ---
                 const bldgList = document.getElementById('building-breakdown-list');
                 bldgList.innerHTML = '';
                 
@@ -462,6 +522,7 @@ function loadDashboard() {
                     `;
                     bldgList.appendChild(item);
                 });
+
             }
         })
         .catch(err => console.error('Error loading dashboard summary:', err));
@@ -482,12 +543,10 @@ function loadAsignaturas() {
                 asignaturaFilters.query = '';
                 asignaturaFilters.tipo = '';
                 asignaturaFilters.seccion = '';
-                asignaturaFilters.rol = '';
                 asignaturaFilters.sort = '';
                 document.getElementById('search-asignatura').value = '';
                 document.getElementById('filter-asignatura-tipo').value = '';
                 document.getElementById('filter-asignatura-seccion').value = '';
-                document.getElementById('filter-asignatura-rol').value = '';
                 document.getElementById('sort-asignaturas').value = '';
                 applyAsignaturaFilters();
             }
@@ -497,18 +556,15 @@ function loadAsignaturas() {
 
 // Apply all client-side asignatura filters and sorting
 function applyAsignaturaFilters() {
-    const { query, tipo, seccion, rol, sort } = asignaturaFilters;
+    const { query, tipo, seccion, sort } = asignaturaFilters;
     const q = query.toLowerCase().trim();
     const sec = seccion.toLowerCase().trim();
 
-    // Flatten: collect parents and children based on rol filter
+    // Flatten: parents + all children
     let flat = [];
     allAsignaturas.forEach(p => {
-        const includeParent = rol !== 'hijo';
-        const includeChildren = rol !== 'padre';
-
-        if (includeParent) flat.push({ ...p, _isChild: false, _parentNrc: null });
-        if (includeChildren && p.componentes_hijo) {
+        flat.push({ ...p, _isChild: false, _parentNrc: null });
+        if (p.componentes_hijo) {
             p.componentes_hijo.forEach(c => flat.push({ ...c, _isChild: true, _parentNrc: p.NRC }));
         }
     });
@@ -551,7 +607,7 @@ function renderFlatAsignaturasTable(items) {
     tbody.innerHTML = '';
 
     if (items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" style="padding:30px; text-align:center; color:var(--text-secondary);">No se encontraron asignaturas con los filtros seleccionados.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" style="padding:30px; text-align:center; color:var(--text-secondary);">No se encontraron asignaturas con los filtros seleccionados.</td></tr>';
         return;
     }
 
@@ -578,6 +634,7 @@ function renderFlatAsignaturasTable(items) {
             <td>${item.MATERIA || ''}${item.CURSO || ''}</td>
             ${tituloCell}
             <td>${item.SECCION || '-'}</td>
+            <td>${item.NIVEL != null ? item.NIVEL : '-'}</td>
             <td>${item.HORAS_TOTALES || '0'} hrs</td>
             <td><span class="badge-type ${typeClass}">${item.TIPO_HORARIO || 'TEO'}</span></td>
             <td>${item.CUPO || '0'}</td>

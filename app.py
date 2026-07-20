@@ -191,8 +191,8 @@ def get_summary():
         if total_rows == 0:
             return jsonify({'success': True, 'empty': True})
             
-        # Total unique subjects (by NRC)
-        cursor.execute("SELECT COUNT(DISTINCT NRC) FROM planificacion")
+        # Total unique subjects (by NRC) - parent NRCs only
+        cursor.execute("SELECT COUNT(DISTINCT NRC) FROM planificacion WHERE NRC_PADRE IS NULL OR TRIM(NRC_PADRE) = ''")
         total_nrcs = cursor.fetchone()[0]
         
         # Total unique Docentes
@@ -221,11 +221,42 @@ def get_summary():
         total_inscritos = sum_row[1] or 0
         total_disponibles = sum_row[2] or 0
         
-        # Total academic hours (sum of HORAS_TOTALES for distinct NRCs)
-        cursor.execute("SELECT SUM(HORAS_TOTALES) FROM (SELECT NRC, HORAS_TOTALES FROM planificacion GROUP BY NRC)")
+        # Total academic hours (sum of HORAS_TOTALES for distinct NRCs) - excluding APM
+        cursor.execute("""
+            SELECT SUM(HORAS_TOTALES) FROM (
+                SELECT NRC, HORAS_TOTALES FROM planificacion 
+                WHERE TIPO_HORARIO != 'APM'
+                GROUP BY NRC
+            )
+        """)
         total_horas = cursor.fetchone()[0] or 0
         
-        # Components breakdown (by distinct NRCs)
+        # Hours breakdown by type (parent NRCs only, excluding APM)
+        cursor.execute("""
+            SELECT TIPO_HORARIO, SUM(HORAS_TOTALES) as horas
+            FROM (
+                SELECT NRC, TIPO_HORARIO, MAX(HORAS_TOTALES) as HORAS_TOTALES
+                FROM planificacion
+                WHERE TIPO_HORARIO != 'APM'
+                GROUP BY NRC
+            )
+            GROUP BY TIPO_HORARIO
+            ORDER BY TIPO_HORARIO
+        """)
+        horas_por_tipo = {row['TIPO_HORARIO']: (row['horas'] or 0) for row in cursor.fetchall()}
+        
+        # NRC padre count by type (parent NRCs only = those with no NRC_PADRE, excluding APM)
+        cursor.execute("""
+            SELECT TIPO_HORARIO, COUNT(DISTINCT NRC) as n
+            FROM planificacion
+            WHERE (NRC_PADRE IS NULL OR TRIM(NRC_PADRE) = '')
+              AND TIPO_HORARIO != 'APM'
+            GROUP BY TIPO_HORARIO
+            ORDER BY TIPO_HORARIO
+        """)
+        nrcs_padre_por_tipo = {row['TIPO_HORARIO']: row['n'] for row in cursor.fetchall()}
+        
+        # Components breakdown (by distinct NRCs) - keep for reference
         cursor.execute("""
             SELECT TIPO_HORARIO, COUNT(DISTINCT NRC) as count 
             FROM planificacion 
@@ -255,6 +286,8 @@ def get_summary():
                 'total_disponibles': total_disponibles,
                 'total_horas': total_horas
             },
+            'horas_por_tipo': horas_por_tipo,
+            'nrcs_padre_por_tipo': nrcs_padre_por_tipo,
             'components': components,
             'edificios': edificios
         })
@@ -430,7 +463,7 @@ def get_docentes():
             subjects = [dict(r) for r in cursor.fetchall()]
             
             t['asignaturas'] = subjects
-            t['total_horas'] = sum(s['HORAS_TOTALES'] or 0 for s in subjects)
+            t['total_horas'] = sum(s['HORAS_TOTALES'] or 0 for s in subjects if s['TIPO_HORARIO'] != 'APM')
             t['n_asignaturas'] = len(subjects)
             
         return jsonify({
