@@ -1093,12 +1093,12 @@ function renderTimetable(containerId, scheduleData, viewType) {
                     }
                     
                     const tipoText = m.TIPO_HORARIO || 'TEO';
-                    let secText = `Sec. ${m.SECCION}`;
+                    let badgeHtml = '';
                     if (m.subgrupo) {
-                        secText = `Grupo ${m.subgrupo} (${m.SECCION})`;
+                        badgeHtml = `<span class="block-badge-type" style="background-color: var(--text-primary); color: white;">Grupo ${m.subgrupo}</span> `;
                     }
                     card.innerHTML = `
-                        <span class="block-subject meta-subject">${m.TITULO} <span class="block-badge-type" style="background-color: var(--text-primary); color: white;">${secText}</span> <span class="block-badge-type meta-tipo ${typeClass}">${tipoText}</span></span>
+                        <span class="block-subject meta-subject">${m.TITULO} ${badgeHtml}<span class="block-badge-type meta-tipo ${typeClass}">${tipoText}</span></span>
                         <span class="block-nrc-sec meta-nrc">${m.MATERIA}${m.CURSO} | NRC ${m.NRC}</span>
                         <div class="block-meta meta-time"><i class="fa-solid fa-clock"></i> ${block.times}</div>
                         ${metaText}
