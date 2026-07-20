@@ -106,6 +106,8 @@ def clean_value(val, col_type):
     if not val:
         return None
     val = val.strip()
+    if val.endswith('.0'):
+        val = val[:-2]
     if 'INTEGER' in col_type:
         try:
             return int(val)
