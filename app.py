@@ -29,7 +29,7 @@ COLUMN_MAPPING = {
     'PERIODO_PLAN': 'PERIODO_PLAN TEXT',
     'NIVEL': 'NIVEL INTEGER',
     'NRC': 'NRC TEXT',
-    'NRC PADRE': 'NRC_PADRE TEXT',  # Map space to underscore
+    'NRC_PADRE': 'NRC_PADRE TEXT',
     'HORAS_TOTALES': 'HORAS_TOTALES INTEGER',
     'MATERIA': 'MATERIA TEXT',
     'CURSO': 'CURSO TEXT',
@@ -392,8 +392,8 @@ def get_filters():
         cursor.execute("SELECT DISTINCT NIVEL FROM planificacion WHERE NIVEL IS NOT NULL ORDER BY NIVEL")
         niveles = [r['NIVEL'] for r in cursor.fetchall()]
         
-        # Fetch distinct Nivel + Seccion pairs
-        cursor.execute("SELECT DISTINCT NIVEL, SECCION FROM planificacion WHERE NIVEL IS NOT NULL AND SECCION IS NOT NULL AND SECCION != '' ORDER BY NIVEL, SECCION")
+        # Fetch distinct Nivel + Seccion pairs for primary sections (no NRC_PADRE)
+        cursor.execute("SELECT DISTINCT NIVEL, SECCION FROM planificacion WHERE NIVEL IS NOT NULL AND SECCION IS NOT NULL AND SECCION != '' AND (NRC_PADRE IS NULL OR NRC_PADRE = '') ORDER BY NIVEL, SECCION")
         niveles_secciones = [{'nivel': r['NIVEL'], 'seccion': r['SECCION']} for r in cursor.fetchall()]
         
         cursor.execute("SELECT DISTINCT DOCENTE FROM planificacion WHERE DOCENTE IS NOT NULL AND DOCENTE != '' ORDER BY DOCENTE")
@@ -668,8 +668,22 @@ def get_schedule():
             conditions.append("NIVEL = ?")
             params.append(int(nivel))
         if seccion:
-            conditions.append("SECCION = ?")
-            params.append(seccion)
+            # We want to find the NRCs of the parent courses in this nivel that have this seccion
+            cursor.execute("""
+                SELECT NRC FROM planificacion 
+                WHERE SECCION = ? AND (NIVEL = ? OR ? IS NULL) AND (NRC_PADRE IS NULL OR NRC_PADRE = '')
+            """, (seccion, int(nivel) if nivel else None, nivel))
+            parent_nrcs = [r['NRC'] for r in cursor.fetchall()]
+            
+            if parent_nrcs:
+                placeholders = ','.join(['?'] * len(parent_nrcs))
+                conditions.append(f"(NRC IN ({placeholders}) OR NRC_PADRE IN ({placeholders}))")
+                params.extend(parent_nrcs)
+                params.extend(parent_nrcs)
+            else:
+                # Fallback if no parents found
+                conditions.append("SECCION = ?")
+                params.append(seccion)
         if sala:
             conditions.append("COD_SALON = ?")
             params.append(sala)
