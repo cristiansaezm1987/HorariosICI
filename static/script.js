@@ -403,12 +403,29 @@ function loadGlobalFilters() {
                 const selectNivel = document.getElementById('select-nivel');
                 const prevNivelVal = selectNivel.value;
                 selectNivel.innerHTML = '<option value="">-- Seleccionar Nivel --</option>';
-                data.niveles.forEach(n => {
-                    const opt = document.createElement('option');
-                    opt.value = n;
-                    opt.textContent = `Nivel ${n} (Semestre ${n / 10})`;
-                    selectNivel.appendChild(opt);
-                });
+                
+                if (data.niveles && data.niveles_secciones) {
+                    data.niveles.forEach(n => {
+                        // General Nivel option
+                        const optGroup = document.createElement('option');
+                        optGroup.value = n;
+                        optGroup.textContent = `Nivel ${n} (Todas las Secciones)`;
+                        optGroup.style.fontWeight = 'bold';
+                        selectNivel.appendChild(optGroup);
+                        
+                        // Specific Seccion options
+                        const sectionsForLevel = data.niveles_secciones.filter(ns => ns.nivel === n);
+                        if (sectionsForLevel.length > 1) {
+                            sectionsForLevel.forEach(ns => {
+                                const opt = document.createElement('option');
+                                opt.value = `${n}|${ns.seccion}`;
+                                opt.innerHTML = `&nbsp;&nbsp;&nbsp;↳ Nivel ${n} - Sección ${ns.seccion}`;
+                                selectNivel.appendChild(opt);
+                            });
+                        }
+                    });
+                }
+                
                 selectNivel.value = prevNivelVal;
                 selectedNivel = prevNivelVal;
             }
@@ -859,9 +876,20 @@ function selectDocente(docente) {
 }
 
 // --- TAB 4: NIVELES ---
-function loadNivelSchedule(nivel) {
+function loadNivelSchedule(nivelStr) {
     const url = new URL('/api/schedule', window.location.origin);
-    url.searchParams.append('nivel', nivel);
+    
+    let displayTitle = '';
+    if (nivelStr.includes('|')) {
+        const [nivel, seccion] = nivelStr.split('|');
+        url.searchParams.append('nivel', nivel);
+        url.searchParams.append('seccion', seccion);
+        displayTitle = `Horario Nivel ${nivel} - Sección ${seccion}`;
+    } else {
+        url.searchParams.append('nivel', nivelStr);
+        displayTitle = `Horario Nivel ${nivelStr} (Todas las Secciones)`;
+    }
+    
     if (globalFilters.carrera) url.searchParams.append('carrera', globalFilters.carrera);
     if (globalFilters.jornada) url.searchParams.append('jornada', globalFilters.jornada);
     
@@ -871,7 +899,7 @@ function loadNivelSchedule(nivel) {
             if (data.success) {
                 const titleEl = document.getElementById('nivel-schedule-title');
                 if (titleEl) {
-                    titleEl.innerHTML = `<i class="fa-solid fa-calendar-days"></i> Horario Nivel ${nivel}`;
+                    titleEl.innerHTML = `<i class="fa-solid fa-calendar-days"></i> ${displayTitle}`;
                 }
                 document.getElementById('nivel-schedule-card').style.display = 'block';
                 renderTimetable('nivel-timetable', data.schedule, 'nivel');

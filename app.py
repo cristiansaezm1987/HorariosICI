@@ -392,6 +392,10 @@ def get_filters():
         cursor.execute("SELECT DISTINCT NIVEL FROM planificacion WHERE NIVEL IS NOT NULL ORDER BY NIVEL")
         niveles = [r['NIVEL'] for r in cursor.fetchall()]
         
+        # Fetch distinct Nivel + Seccion pairs
+        cursor.execute("SELECT DISTINCT NIVEL, SECCION FROM planificacion WHERE NIVEL IS NOT NULL AND SECCION IS NOT NULL AND SECCION != '' ORDER BY NIVEL, SECCION")
+        niveles_secciones = [{'nivel': r['NIVEL'], 'seccion': r['SECCION']} for r in cursor.fetchall()]
+        
         cursor.execute("SELECT DISTINCT DOCENTE FROM planificacion WHERE DOCENTE IS NOT NULL AND DOCENTE != '' ORDER BY DOCENTE")
         docentes = [r['DOCENTE'] for r in cursor.fetchall()]
         
@@ -412,6 +416,7 @@ def get_filters():
             'empty': False,
             'carreras': carreras,
             'niveles': niveles,
+            'niveles_secciones': niveles_secciones,
             'docentes': docentes,
             'salas': salas,
             'edificios': edificios,
@@ -630,6 +635,7 @@ def get_salas():
 def get_schedule():
     docente = request.args.get('docente')
     nivel = request.args.get('nivel')
+    seccion = request.args.get('seccion')
     sala = request.args.get('sala')
     carrera = request.args.get('carrera')
     jornada = request.args.get('jornada')
@@ -661,6 +667,9 @@ def get_schedule():
         if nivel:
             conditions.append("NIVEL = ?")
             params.append(int(nivel))
+        if seccion:
+            conditions.append("SECCION = ?")
+            params.append(seccion)
         if sala:
             conditions.append("COD_SALON = ?")
             params.append(sala)
