@@ -541,6 +541,16 @@ function loadDashboard() {
                     data.jerarquias || {}
                 );
 
+                // --- Panel 6: Grados / Títulos (Doughnut Chart) ---
+                renderDoughnutChart(
+                    'chart-grados',
+                    data.grados || {},
+                    [
+                        '#3a7fc1', '#da291c', '#0f2b5c', '#4caf7d',
+                        '#e57c35', '#9c59d1', '#64748b', '#f0a500'
+                    ]
+                );
+
             }
         })
         .catch(err => console.error('Error loading dashboard summary:', err));

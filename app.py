@@ -306,6 +306,20 @@ def get_summary():
         """)
         jerarquias = {row['JERARQUIA']: row['count'] for row in cursor.fetchall()}
         
+        # Grados (titles) distribution (unique teachers)
+        cursor.execute("""
+            SELECT 
+                CASE
+                    WHEN GRADO IS NULL OR TRIM(GRADO) = '' THEN 'Sin grado informado'
+                    ELSE GRADO
+                END as grado_label,
+                COUNT(DISTINCT DOCENTE) as count
+            FROM planificacion
+            WHERE DOCENTE IS NOT NULL AND DOCENTE != ''
+            GROUP BY grado_label
+        """)
+        grados = {row['grado_label']: row['count'] for row in cursor.fetchall()}
+        
         return jsonify({
             'success': True,
             'empty': False,
@@ -324,7 +338,8 @@ def get_summary():
             'components': components,
             'edificios': edificios,
             'contratos': contratos,
-            'jerarquias': jerarquias
+            'jerarquias': jerarquias,
+            'grados': grados
         })
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
