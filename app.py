@@ -398,10 +398,10 @@ def get_filters():
         cursor.execute("""
             SELECT NIVEL, MAX(num_sections) as max_secciones
             FROM (
-                SELECT NIVEL, MATERIA, CURSO, COUNT(*) as num_sections
+                SELECT NIVEL, MATERIA, CURSO, CARRERA, COUNT(DISTINCT NRC) as num_sections
                 FROM planificacion
                 WHERE NIVEL IS NOT NULL AND (NRC_PADRE IS NULL OR NRC_PADRE = '')
-                GROUP BY NIVEL, MATERIA, CURSO
+                GROUP BY NIVEL, MATERIA, CURSO, CARRERA
             )
             GROUP BY NIVEL
         """)
@@ -687,12 +687,22 @@ def get_schedule():
         if seccion:
             try:
                 sec_idx = int(seccion) - 1
-                cursor.execute("""
-                    SELECT NRC, MATERIA, CURSO
+                
+                # We need to respect the carrera filter when determining the Nth section!
+                parent_query = """
+                    SELECT DISTINCT NRC, MATERIA, CURSO, SECCION
                     FROM planificacion 
                     WHERE (NIVEL = ? OR ? IS NULL) AND (NRC_PADRE IS NULL OR NRC_PADRE = '')
-                    ORDER BY MATERIA, CURSO, SECCION
-                """, (int(nivel) if nivel else None, nivel))
+                """
+                parent_params = [int(nivel) if nivel else None, nivel]
+                
+                if carrera:
+                    parent_query += " AND CARRERA = ?"
+                    parent_params.append(carrera)
+                
+                parent_query += " ORDER BY MATERIA, CURSO, SECCION"
+                
+                cursor.execute(parent_query, parent_params)
                 
                 # Group by subject and pick the Nth NRC
                 from collections import defaultdict
