@@ -2,10 +2,20 @@ import os
 import csv
 import sqlite3
 import re
+import tempfile
+import shutil
 from flask import Flask, request, jsonify, send_from_directory
 
 app = Flask(__name__, static_folder='static', static_url_path='')
+
+# For Serverless environments (like Vercel), the root is read-only.
+# We copy the database to /tmp so it can be read/written during the instance lifecycle.
 DATABASE_FILE = 'planificacion.db'
+if os.environ.get('VERCEL') or not os.access('.', os.W_OK):
+    tmp_db = os.path.join(tempfile.gettempdir(), 'planificacion.db')
+    if not os.path.exists(tmp_db) and os.path.exists(DATABASE_FILE):
+        shutil.copy2(DATABASE_FILE, tmp_db)
+    DATABASE_FILE = tmp_db
 
 # Define standard columns and their SQL types
 # We map CSV column names to safe SQL column names
@@ -160,7 +170,7 @@ def upload_file():
         
     try:
         # Save temp file
-        temp_path = 'temp_upload.csv'
+        temp_path = os.path.join(tempfile.gettempdir(), 'temp_upload.csv')
         file.save(temp_path)
         
         # Import to SQLite
