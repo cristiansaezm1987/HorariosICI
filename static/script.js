@@ -192,12 +192,13 @@ function setupEventListeners() {
         if (selectNivel) selectNivel.value = '';
         const scheduleCard = document.getElementById('nivel-schedule-card');
         if (scheduleCard) scheduleCard.style.display = 'none';
-        refreshActiveTab();
+        
+        loadGlobalFilters().then(() => refreshActiveTab());
     });
 
     document.getElementById('filter-jornada').addEventListener('change', (e) => {
         globalFilters.jornada = e.target.value;
-        refreshActiveTab();
+        loadGlobalFilters().then(() => refreshActiveTab());
     });
 
     document.getElementById('btn-clear-filters').addEventListener('click', () => {
@@ -213,7 +214,7 @@ function setupEventListeners() {
         if (scheduleCard) scheduleCard.style.display = 'none';
 
         showToast('Filtros globales limpiados.', 'info');
-        refreshActiveTab();
+        loadGlobalFilters().then(() => refreshActiveTab());
     });
 
     // Client-side search in lists
@@ -502,7 +503,7 @@ function loadGlobalFilters() {
     if (globalFilters.carrera) url.searchParams.append('carrera', globalFilters.carrera);
     if (globalFilters.jornada) url.searchParams.append('jornada', globalFilters.jornada);
     
-    fetch(url)
+    return fetch(url)
         .then(res => res.json())
         .then(data => {
             if (data.success) {
