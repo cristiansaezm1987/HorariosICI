@@ -161,17 +161,37 @@ def upload_file():
     if 'file' not in request.files:
         return jsonify({'success': False, 'message': 'No se encontró archivo en la solicitud'}), 400
     
-    file = request.files['file']
-    if file.filename == '':
+    files = request.files.getlist('file')
+    if not files or files[0].filename == '':
         return jsonify({'success': False, 'message': 'Nombre de archivo vacío'}), 400
         
-    if not file.filename.endswith('.csv'):
-        return jsonify({'success': False, 'message': 'El archivo debe ser de formato CSV'}), 400
-        
     try:
+        import pandas as pd
+        dfs = []
+        
+        for file in files:
+            if not file.filename.endswith('.csv'):
+                return jsonify({'success': False, 'message': 'Todos los archivos deben ser de formato CSV'}), 400
+            
+            try:
+                df = pd.read_csv(file, sep=None, engine='python', encoding='utf-8')
+            except UnicodeDecodeError:
+                file.seek(0)
+                df = pd.read_csv(file, sep=None, engine='python', encoding='latin1')
+            except Exception:
+                file.seek(0)
+                df = pd.read_csv(file, sep=None, engine='python', encoding='cp1252')
+                
+            dfs.append(df)
+            
+        if not dfs:
+            return jsonify({'success': False, 'message': 'No se pudo procesar ningún archivo'}), 400
+            
+        combined_df = pd.concat(dfs, ignore_index=True)
+        
         # Save temp file
         temp_path = os.path.join(tempfile.gettempdir(), 'temp_upload.csv')
-        file.save(temp_path)
+        combined_df.to_csv(temp_path, index=False, encoding='utf-8')
         
         # Import to SQLite
         rows_inserted = import_csv_to_db(temp_path)

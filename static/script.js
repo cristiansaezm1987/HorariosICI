@@ -139,9 +139,10 @@ function setupEventListeners() {
 
     fileInput.addEventListener('change', () => {
         if (fileInput.files.length > 0) {
-            const file = fileInput.files[0];
-            fileNameDisplay.textContent = file.name;
-            uploadCSV(file);
+            const files = Array.from(fileInput.files);
+            const fileNames = files.map(f => f.name).join(', ');
+            fileNameDisplay.textContent = fileNames;
+            uploadCSV(files);
         }
     });
 
@@ -166,11 +167,11 @@ function setupEventListeners() {
 
     uploadBox.addEventListener('drop', (e) => {
         const dt = e.dataTransfer;
-        const files = dt.files;
-        if (files.length > 0 && files[0].name.endsWith('.csv')) {
-            fileInput.files = files;
-            fileNameDisplay.textContent = files[0].name;
-            uploadCSV(files[0]);
+        const files = Array.from(dt.files).filter(f => f.name.endsWith('.csv'));
+        if (files.length > 0) {
+            const fileNames = files.map(f => f.name).join(', ');
+            fileNameDisplay.textContent = fileNames;
+            uploadCSV(files);
         } else {
             showToast('Por favor, arrastra solo archivos CSV válidos.', 'error');
         }
@@ -276,7 +277,7 @@ function setupEventListeners() {
 }
 
 // --- FILE UPLOAD LOGIC ---
-function uploadCSV(file) {
+function uploadCSV(files) {
     const uploadProgress = document.getElementById('upload-progress');
     const progressBarFill = uploadProgress.querySelector('.progress-bar-fill');
     
@@ -284,7 +285,14 @@ function uploadCSV(file) {
     progressBarFill.style.width = '0%';
     
     const formData = new FormData();
-    formData.append('file', file);
+    // Support either single file or array of files
+    if (Array.isArray(files) || files instanceof FileList) {
+        for(let i=0; i<files.length; i++) {
+            formData.append('file', files[i]);
+        }
+    } else {
+        formData.append('file', files);
+    }
     
     // Perform upload
     const xhr = new XMLHttpRequest();
@@ -1007,7 +1015,7 @@ function renderTimetable(containerId, scheduleData, viewType) {
             if (matches.length > 0) {
                 dayCell.classList.add('has-class');
                 
-                matches.forEach(m => {
+                matches.forEach((m, index) => {
                     const card = document.createElement('div');
                     
                     // Generate color based on subject name
@@ -1025,6 +1033,14 @@ function renderTimetable(containerId, scheduleData, viewType) {
                     card.className = `schedule-block-card`;
                     card.style.setProperty('background-color', bgCol, 'important');
                     card.style.setProperty('border-left-color', borderCol, 'important');
+                    
+                    // Visual cascade for overlapping sections
+                    if (index > 0) {
+                        card.style.marginLeft = `${index * 12}px`;
+                        card.style.marginTop = `-${index * 15}px`;
+                        card.style.boxShadow = '-2px 2px 8px rgba(0,0,0,0.15)';
+                        card.style.zIndex = index;
+                    }
                     
                     // Customize meta displayed in cards based on view type
                     let metaText = '';
@@ -1050,8 +1066,8 @@ function renderTimetable(containerId, scheduleData, viewType) {
                     
                     const tipoText = m.TIPO_HORARIO || 'TEO';
                     card.innerHTML = `
-                        <span class="block-subject meta-subject">${m.TITULO} <span class="block-badge-type meta-tipo ${typeClass}">${tipoText}</span></span>
-                        <span class="block-nrc-sec meta-nrc">${m.MATERIA}${m.CURSO} [Sec. ${m.SECCION}] | NRC ${m.NRC}</span>
+                        <span class="block-subject meta-subject">${m.TITULO} <span class="block-badge-type" style="background-color: var(--text-primary); color: white;">Sec. ${m.SECCION}</span> <span class="block-badge-type meta-tipo ${typeClass}">${tipoText}</span></span>
+                        <span class="block-nrc-sec meta-nrc">${m.MATERIA}${m.CURSO} | NRC ${m.NRC}</span>
                         <div class="block-meta meta-time"><i class="fa-solid fa-clock"></i> ${block.times}</div>
                         ${metaText}
                     `;
