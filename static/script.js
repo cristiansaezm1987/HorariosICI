@@ -419,7 +419,7 @@ function loadGlobalFilters() {
                             sectionsForLevel.forEach(ns => {
                                 const opt = document.createElement('option');
                                 opt.value = `${n}|${ns.seccion}`;
-                                opt.innerHTML = `&nbsp;&nbsp;&nbsp;↳ Nivel ${n} - Sección ${ns.seccion}`;
+                                opt.innerHTML = `&nbsp;&nbsp;&nbsp;↳ Nivel ${n} - Grupo ${ns.seccion}`;
                                 selectNivel.appendChild(opt);
                             });
                         }
@@ -884,10 +884,10 @@ function loadNivelSchedule(nivelStr) {
         const [nivel, seccion] = nivelStr.split('|');
         url.searchParams.append('nivel', nivel);
         url.searchParams.append('seccion', seccion);
-        displayTitle = `Horario Nivel ${nivel} - Sección ${seccion}`;
+        displayTitle = `Horario Nivel ${nivel} - Grupo ${seccion}`;
     } else {
         url.searchParams.append('nivel', nivelStr);
-        displayTitle = `Horario Nivel ${nivelStr} (Todas las Secciones)`;
+        displayTitle = `Horario Nivel ${nivelStr} (Todos los Grupos)`;
     }
     
     if (globalFilters.carrera) url.searchParams.append('carrera', globalFilters.carrera);

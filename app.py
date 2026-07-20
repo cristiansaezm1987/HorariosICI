@@ -394,9 +394,24 @@ def get_filters():
         cursor.execute("SELECT DISTINCT NIVEL FROM planificacion WHERE NIVEL IS NOT NULL ORDER BY NIVEL")
         niveles = [r['NIVEL'] for r in cursor.fetchall()]
         
-        # Fetch distinct Nivel + Seccion pairs for primary sections (no NRC_PADRE)
-        cursor.execute("SELECT DISTINCT NIVEL, SECCION FROM planificacion WHERE NIVEL IS NOT NULL AND SECCION IS NOT NULL AND SECCION != '' AND (NRC_PADRE IS NULL OR NRC_PADRE = '') ORDER BY NIVEL, SECCION")
-        niveles_secciones = [{'nivel': r['NIVEL'], 'seccion': r['SECCION']} for r in cursor.fetchall()]
+        # Fetch the maximum number of primary sections any course has in each Nivel
+        cursor.execute("""
+            SELECT NIVEL, MAX(num_sections) as max_secciones
+            FROM (
+                SELECT NIVEL, MATERIA, CURSO, COUNT(*) as num_sections
+                FROM planificacion
+                WHERE NIVEL IS NOT NULL AND (NRC_PADRE IS NULL OR NRC_PADRE = '')
+                GROUP BY NIVEL, MATERIA, CURSO
+            )
+            GROUP BY NIVEL
+        """)
+        niveles_secciones = []
+        for r in cursor.fetchall():
+            nivel = r['NIVEL']
+            max_sec = r['max_secciones']
+            if max_sec:
+                for i in range(1, max_sec + 1):
+                    niveles_secciones.append({'nivel': nivel, 'seccion': str(i)})
         
         cursor.execute("SELECT DISTINCT DOCENTE FROM planificacion WHERE DOCENTE IS NOT NULL AND DOCENTE != '' ORDER BY DOCENTE")
         docentes = [r['DOCENTE'] for r in cursor.fetchall()]
@@ -670,20 +685,35 @@ def get_schedule():
             conditions.append("NIVEL = ?")
             params.append(int(nivel))
         if seccion:
-            # We want to find the NRCs of the parent courses in this nivel that have this seccion
-            cursor.execute("""
-                SELECT NRC FROM planificacion 
-                WHERE SECCION = ? AND (NIVEL = ? OR ? IS NULL) AND (NRC_PADRE IS NULL OR NRC_PADRE = '')
-            """, (seccion, int(nivel) if nivel else None, nivel))
-            parent_nrcs = [r['NRC'] for r in cursor.fetchall()]
-            
-            if parent_nrcs:
-                placeholders = ','.join(['?'] * len(parent_nrcs))
-                conditions.append(f"(NRC IN ({placeholders}) OR NRC_PADRE IN ({placeholders}))")
-                params.extend(parent_nrcs)
-                params.extend(parent_nrcs)
-            else:
-                # Fallback if no parents found
+            try:
+                sec_idx = int(seccion) - 1
+                cursor.execute("""
+                    SELECT NRC, MATERIA, CURSO
+                    FROM planificacion 
+                    WHERE (NIVEL = ? OR ? IS NULL) AND (NRC_PADRE IS NULL OR NRC_PADRE = '')
+                    ORDER BY MATERIA, CURSO, SECCION
+                """, (int(nivel) if nivel else None, nivel))
+                
+                # Group by subject and pick the Nth NRC
+                from collections import defaultdict
+                subject_nrcs = defaultdict(list)
+                for r in cursor.fetchall():
+                    subj_key = f"{r['MATERIA']}_{r['CURSO']}"
+                    subject_nrcs[subj_key].append(r['NRC'])
+                
+                parent_nrcs = []
+                for subj, nrc_list in subject_nrcs.items():
+                    if sec_idx < len(nrc_list):
+                        parent_nrcs.append(nrc_list[sec_idx])
+                
+                if parent_nrcs:
+                    placeholders = ','.join(['?'] * len(parent_nrcs))
+                    conditions.append(f"(NRC IN ({placeholders}) OR NRC_PADRE IN ({placeholders}))")
+                    params.extend(parent_nrcs)
+                    params.extend(parent_nrcs)
+                else:
+                    conditions.append("1 = 0") # Impossible condition since no parents match this group
+            except ValueError:
                 conditions.append("SECCION = ?")
                 params.append(seccion)
         if sala:
