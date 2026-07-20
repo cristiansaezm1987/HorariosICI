@@ -667,7 +667,7 @@ def get_schedule():
             
         # We need rows with day and hour information
         query = """
-            SELECT NRC, TITULO, MATERIA, CURSO, SECCION, TIPO_HORARIO, DOCENTE, 
+            SELECT NRC, NRC_PADRE, TITULO, MATERIA, CURSO, SECCION, TIPO_HORARIO, DOCENTE, 
                    COD_SALON, SALON, EDIFICIO, NIVEL, CARRERA, JORNADA,
                    LUNES, MARTES, MIERCOLES, JUEVES, VIERNES, SABADO, DOMINGO,
                    HORA_INCIO, HORA_FIN
@@ -742,6 +742,23 @@ def get_schedule():
         cursor.execute(query, params)
         rows = [dict(r) for r in cursor.fetchall()]
         
+        # Identify subgroups within families (e.g. multiple LABs for the same parent)
+        from collections import defaultdict
+        family_groups = defaultdict(lambda: defaultdict(set))
+        for r in rows:
+            fam_id = r['NRC_PADRE'] if r['NRC_PADRE'] else r['NRC']
+            tipo = r['TIPO_HORARIO']
+            family_groups[fam_id][tipo].add((r['NRC'], r['SECCION']))
+            
+        nrc_to_subgrupo = {}
+        for fam_id, tipos in family_groups.items():
+            for tipo, nrc_sec_set in tipos.items():
+                if len(nrc_sec_set) > 1:
+                    # Sort by SECCION string to assign deterministic index
+                    sorted_list = sorted(list(nrc_sec_set), key=lambda x: x[1] if x[1] else "")
+                    for idx, (nrc, _) in enumerate(sorted_list):
+                        nrc_to_subgrupo[nrc] = idx + 1
+
         # Format times for easier client usage (e.g. HH:MM)
         formatted_rows = []
         for r in rows:
@@ -754,6 +771,9 @@ def get_schedule():
             
             r['hora_inicio_fmt'] = start_formatted
             r['hora_fin_fmt'] = end_formatted
+            
+            r['subgrupo'] = nrc_to_subgrupo.get(r['NRC'], None)
+            
             formatted_rows.append(r)
             
         return jsonify({
