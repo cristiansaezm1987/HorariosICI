@@ -221,24 +221,39 @@ def get_summary():
         total_inscritos = sum_row[1] or 0
         total_disponibles = sum_row[2] or 0
         
-        # Total academic hours (sum of HORAS_TOTALES for distinct NRCs) - excluding APM
+        # Total academic hours (sum of weekly blocks for distinct NRCs) - excluding APM
         cursor.execute("""
-            SELECT SUM(HORAS_TOTALES) FROM (
-                SELECT NRC, HORAS_TOTALES FROM planificacion 
-                WHERE TIPO_HORARIO != 'APM'
+            SELECT SUM(weekly_blocks) FROM (
+                SELECT NRC,
+                       (SUM(CASE WHEN LUNES='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN MARTES='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN MIERCOLES='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN JUEVES='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN VIERNES='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN SABADO='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN DOMINGO='Y' THEN 1 ELSE 0 END)) as weekly_blocks
+                FROM planificacion 
+                WHERE TIPO_HORARIO != 'APM' AND HORA_INCIO IS NOT NULL AND HORA_INCIO != ''
                 GROUP BY NRC
             )
         """)
         total_horas = cursor.fetchone()[0] or 0
         
-        # Hours breakdown by type (parent NRCs only, excluding APM)
+        # Hours breakdown by type (parent NRCs only, excluding APM, using weekly blocks)
         cursor.execute("""
-            SELECT TIPO_HORARIO, SUM(HORAS_TOTALES) as horas
+            SELECT TIPO_HORARIO, SUM(weekly_blocks) as horas
             FROM (
-                SELECT NRC, TIPO_HORARIO, MAX(HORAS_TOTALES) as HORAS_TOTALES
+                SELECT NRC, TIPO_HORARIO,
+                       (SUM(CASE WHEN LUNES='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN MARTES='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN MIERCOLES='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN JUEVES='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN VIERNES='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN SABADO='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN DOMINGO='Y' THEN 1 ELSE 0 END)) as weekly_blocks
                 FROM planificacion
-                WHERE TIPO_HORARIO != 'APM'
-                GROUP BY NRC
+                WHERE TIPO_HORARIO != 'APM' AND HORA_INCIO IS NOT NULL AND HORA_INCIO != ''
+                GROUP BY NRC, TIPO_HORARIO
             )
             GROUP BY TIPO_HORARIO
             ORDER BY TIPO_HORARIO
@@ -357,10 +372,17 @@ def get_asignaturas():
         if cursor.fetchone()[0] == 0:
             return jsonify({'success': True, 'empty': True})
             
-        # Build query for all unique sections (NRCs)
+        # Build query for all unique sections (NRCs) with calculated weekly blocks as HORAS_TOTALES
         query = """
-            SELECT NRC, NRC_PADRE, MATERIA, CURSO, TITULO, SECCION, HORAS_TOTALES, TIPO_HORARIO,
-                   CUPO, INSCRITOS, DISPONIBLES, DOCENTE, NIVEL, CARRERA, JORNADA
+            SELECT NRC, NRC_PADRE, MATERIA, CURSO, TITULO, SECCION, 
+                   (SUM(CASE WHEN LUNES='Y' THEN 1 ELSE 0 END) +
+                    SUM(CASE WHEN MARTES='Y' THEN 1 ELSE 0 END) +
+                    SUM(CASE WHEN MIERCOLES='Y' THEN 1 ELSE 0 END) +
+                    SUM(CASE WHEN JUEVES='Y' THEN 1 ELSE 0 END) +
+                    SUM(CASE WHEN VIERNES='Y' THEN 1 ELSE 0 END) +
+                    SUM(CASE WHEN SABADO='Y' THEN 1 ELSE 0 END) +
+                    SUM(CASE WHEN DOMINGO='Y' THEN 1 ELSE 0 END)) as HORAS_TOTALES,
+                   TIPO_HORARIO, CUPO, INSCRITOS, DISPONIBLES, DOCENTE, NIVEL, CARRERA, JORNADA
             FROM planificacion
             GROUP BY NRC
         """
@@ -381,8 +403,15 @@ def get_asignaturas():
             # We must apply filters in a subquery or filter unique NRCs carefully.
             # Let's filter the rows first, then group by NRC.
             query = f"""
-                SELECT NRC, NRC_PADRE, MATERIA, CURSO, TITULO, SECCION, HORAS_TOTALES, TIPO_HORARIO,
-                       CUPO, INSCRITOS, DISPONIBLES, DOCENTE, NIVEL, CARRERA, JORNADA
+                SELECT NRC, NRC_PADRE, MATERIA, CURSO, TITULO, SECCION, 
+                       (SUM(CASE WHEN LUNES='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN MARTES='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN MIERCOLES='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN JUEVES='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN VIERNES='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN SABADO='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN DOMINGO='Y' THEN 1 ELSE 0 END)) as HORAS_TOTALES,
+                       TIPO_HORARIO, CUPO, INSCRITOS, DISPONIBLES, DOCENTE, NIVEL, CARRERA, JORNADA
                 FROM planificacion
                 WHERE {' AND '.join(conditions)}
                 GROUP BY NRC
@@ -453,9 +482,17 @@ def get_docentes():
         for t in teachers:
             docente_name = t['DOCENTE']
             
-            # Subquery to get distinct NRCs for this teacher and their properties
+            # Subquery to get distinct NRCs for this teacher and their properties, calculating weekly blocks as HORAS_TOTALES
             cursor.execute("""
-                SELECT NRC, TITULO, MATERIA, CURSO, SECCION, HORAS_TOTALES, TIPO_HORARIO
+                SELECT NRC, TITULO, MATERIA, CURSO, SECCION, 
+                       (SUM(CASE WHEN LUNES='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN MARTES='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN MIERCOLES='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN JUEVES='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN VIERNES='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN SABADO='Y' THEN 1 ELSE 0 END) +
+                        SUM(CASE WHEN DOMINGO='Y' THEN 1 ELSE 0 END)) as HORAS_TOTALES,
+                       TIPO_HORARIO
                 FROM planificacion
                 WHERE DOCENTE = ?
                 GROUP BY NRC
