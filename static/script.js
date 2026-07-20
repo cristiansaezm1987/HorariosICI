@@ -187,6 +187,11 @@ function setupEventListeners() {
     // Global filters change
     document.getElementById('filter-carrera').addEventListener('change', (e) => {
         globalFilters.carrera = e.target.value;
+        selectedNivel = '';
+        const selectNivel = document.getElementById('select-nivel');
+        if (selectNivel) selectNivel.value = '';
+        const scheduleCard = document.getElementById('nivel-schedule-card');
+        if (scheduleCard) scheduleCard.style.display = 'none';
         refreshActiveTab();
     });
 
@@ -200,6 +205,13 @@ function setupEventListeners() {
         document.getElementById('filter-jornada').value = '';
         globalFilters.carrera = '';
         globalFilters.jornada = '';
+        
+        selectedNivel = '';
+        const selectNivel = document.getElementById('select-nivel');
+        if (selectNivel) selectNivel.value = '';
+        const scheduleCard = document.getElementById('nivel-schedule-card');
+        if (scheduleCard) scheduleCard.style.display = 'none';
+
         showToast('Filtros globales limpiados.', 'info');
         refreshActiveTab();
     });
