@@ -11,8 +11,8 @@ env/
 *.db
 *.sqlite3
 
-# Temp files
-temp_upload.csv
+# Data Files (CSVs)
+*.csv
 
 # Editors
 .vscode/
