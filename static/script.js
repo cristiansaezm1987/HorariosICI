@@ -25,14 +25,20 @@ let asignaturaFilters = {
 
 // Standard schedule blocks:
 const SCHEDULE_BLOCKS = [
-    { label: 'Bloque 1', times: '08:00 - 09:20', range: [800, 920] },
-    { label: 'Bloque 2', times: '09:30 - 10:50', range: [930, 1050] },
-    { label: 'Bloque 3', times: '11:00 - 12:20', range: [1100, 1220] },
-    { label: 'Bloque 4', times: '12:30 - 13:50', range: [1230, 1350] },
-    { label: 'Bloque 5', times: '14:00 - 15:20', range: [1400, 1520] },
-    { label: 'Bloque 6', times: '15:30 - 16:50', range: [1530, 1650] },
-    { label: 'Bloque 7', times: '17:00 - 18:20', range: [1700, 1820] },
-    { label: 'Bloque 8', times: '18:30 - 19:50', range: [1830, 1950] }
+    { label: 'Bloque 1', times: '08:00 - 08:40', range: [800, 840] },
+    { label: 'Bloque 2', times: '08:41 - 09:20', range: [841, 920] },
+    { label: 'Bloque 3', times: '09:30 - 10:10', range: [930, 1010] },
+    { label: 'Bloque 4', times: '10:11 - 10:50', range: [1011, 1050] },
+    { label: 'Bloque 5', times: '11:00 - 11:40', range: [1100, 1140] },
+    { label: 'Bloque 6', times: '11:41 - 12:20', range: [1141, 1220] },
+    { label: 'Bloque 7', times: '12:30 - 13:10', range: [1230, 1310] },
+    { label: 'Bloque 8', times: '13:11 - 13:50', range: [1311, 1350] },
+    { label: 'Bloque 9', times: '14:00 - 14:40', range: [1400, 1440] },
+    { label: 'Bloque 10', times: '14:41 - 15:20', range: [1441, 1520] },
+    { label: 'Bloque 11', times: '15:30 - 16:10', range: [1530, 1610] },
+    { label: 'Bloque 12', times: '16:11 - 16:50', range: [1611, 1650] },
+    { label: 'Bloque 13', times: '17:00 - 17:40', range: [1700, 1740] },
+    { label: 'Bloque 14', times: '17:41 - 18:20', range: [1741, 1820] }
 ];
 
 const WEEKDAYS = [
@@ -43,21 +49,13 @@ const WEEKDAYS = [
     { key: 'VIERNES', label: 'Viernes' }
 ];
 
-// Helper to determine block index by HORA_INCIO
-function getBlockIndex(horaInicioStr) {
-    if (!horaInicioStr) return -1;
-    const h = parseInt(horaInicioStr);
-    
-    // We check which standard range the start time fits into
-    if (h >= 800 && h < 930) return 0;
-    if (h >= 930 && h < 1100) return 1;
-    if (h >= 1100 && h < 1230) return 2;
-    if (h >= 1230 && h < 1400) return 3;
-    if (h >= 1400 && h < 1530) return 4;
-    if (h >= 1530 && h < 1700) return 5;
-    if (h >= 1700 && h < 1830) return 6;
-    if (h >= 1830) return 7;
-    return -1;
+// Helper to check if a class session overlaps with a schedule block
+function isSessionInBlock(session, block) {
+    if (!session.HORA_INCIO || !session.HORA_FIN) return false;
+    const sStart = parseInt(session.HORA_INCIO);
+    const sEnd = parseInt(session.HORA_FIN);
+    const [bStart, bEnd] = block.range;
+    return Math.max(sStart, bStart) < Math.min(sEnd, bEnd);
 }
 
 // --- INITIALIZATION ---
@@ -972,11 +970,10 @@ function renderTimetable(containerId, scheduleData, viewType) {
             const dayCell = document.createElement('div');
             dayCell.className = 'grid-cell-day';
             
-            // Find matches for this day and block index
+            // Find matches for this day and block
             const matches = scheduleData.filter(s => {
                 const isDayActive = s[day.key] === 'Y';
-                const sBlockIdx = getBlockIndex(s.HORA_INCIO);
-                return isDayActive && sBlockIdx === bIdx;
+                return isDayActive && isSessionInBlock(s, block);
             });
             
             if (matches.length > 0) {

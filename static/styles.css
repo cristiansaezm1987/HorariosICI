@@ -1180,6 +1180,20 @@ button {
     .grid-cell-day {
         background-color: white !important;
         border: 1px solid #e2e8f0 !important;
+        min-height: 42px !important;
+        padding: 4px !important;
+    }
+    
+    .grid-cell-hour {
+        padding: 4px !important;
+    }
+
+    .grid-cell-hour .hour-title {
+        font-size: 0.75rem !important;
+    }
+
+    .grid-cell-hour .hour-subtitle {
+        font-size: 0.55rem !important;
     }
     
     .schedule-block-card {
@@ -1189,6 +1203,21 @@ button {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
         page-break-inside: avoid;
+        padding: 4px 6px !important;
+    }
+    
+    .schedule-block-card .block-subject {
+        font-size: 0.7rem !important;
+        line-height: 1.1 !important;
+    }
+    
+    .schedule-block-card .block-nrc-sec {
+        font-size: 0.6rem !important;
+    }
+
+    .schedule-block-card .block-meta {
+        font-size: 0.55rem !important;
+        margin-top: 1px !important;
     }
     
     .schedule-block-card.type-teo { border-left: 4px solid #da291c !important; background-color: rgba(218, 41, 28, 0.05) !important; }
