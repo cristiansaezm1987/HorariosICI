@@ -765,9 +765,21 @@ def get_schedule():
         overlay_nivel = request.args.get('overlay_nivel')
         if overlay_carrera and overlay_nivel:
             overlay_seccion = request.args.get('overlay_seccion')
+            overlay_exclude_str = request.args.get('overlay_exclude')
+            
             overlay_rows = fetch_schedule_rows(docente, overlay_nivel, overlay_seccion, sala, overlay_carrera, jornada)
+            
+            overlay_exclude_list = []
+            if overlay_exclude_str:
+                overlay_exclude_list = [t.strip() for t in overlay_exclude_str.split('|') if t.strip()]
+                
+            filtered_overlay_rows = []
             for r in overlay_rows:
-                r['is_overlay'] = True
+                if r['TITULO'] not in overlay_exclude_list:
+                    r['is_overlay'] = True
+                    filtered_overlay_rows.append(r)
+            
+            overlay_rows = filtered_overlay_rows
             
             # Combine without duplicates (same NRC and same time blocks)
             # A combination of NRC + LUNES + HORA_INCIO is usually unique for a block

@@ -323,9 +323,72 @@ function setupEventListeners() {
     });
 
     overlayNivelSelect.addEventListener('change', (e) => {
-        if (e.target.value) {
-            btnConfirmOverlay.disabled = false;
+        const val = e.target.value;
+        const subjectsContainer = document.getElementById('overlay-subjects-container');
+        const subjectsList = document.getElementById('overlay-subjects-list');
+        
+        subjectsList.innerHTML = 'Cargando asignaturas...';
+        subjectsContainer.style.display = 'block';
+        btnConfirmOverlay.disabled = true;
+
+        if (val) {
+            let n = val, s = '';
+            if (val.includes('|')) {
+                [n, s] = val.split('|');
+            }
+            
+            const carrera = overlayCarreraSelect.value;
+            let url = `/api/schedule?carrera=${encodeURIComponent(carrera)}&nivel=${encodeURIComponent(n)}`;
+            if (s) url += `&seccion=${encodeURIComponent(s)}`;
+            if (globalFilters.jornada) url += `&jornada=${encodeURIComponent(globalFilters.jornada)}`;
+            
+            fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.schedule) {
+                        const uniqueTitles = [...new Set(data.schedule.map(item => item.TITULO))].filter(Boolean);
+                        subjectsList.innerHTML = '';
+                        
+                        if (uniqueTitles.length === 0) {
+                            subjectsList.innerHTML = 'No se encontraron asignaturas.';
+                            btnConfirmOverlay.disabled = false; // Allow importing nothing (which is weird but ok)
+                            return;
+                        }
+                        
+                        uniqueTitles.forEach(title => {
+                            const label = document.createElement('label');
+                            label.style.display = 'flex';
+                            label.style.alignItems = 'center';
+                            label.style.gap = '8px';
+                            label.style.cursor = 'pointer';
+                            
+                            const chk = document.createElement('input');
+                            chk.type = 'checkbox';
+                            chk.className = 'overlay-subject-chk';
+                            chk.value = title;
+                            chk.checked = true;
+                            
+                            const span = document.createElement('span');
+                            span.textContent = title;
+                            
+                            label.appendChild(chk);
+                            label.appendChild(span);
+                            subjectsList.appendChild(label);
+                        });
+                        
+                        btnConfirmOverlay.disabled = false;
+                    } else {
+                        subjectsList.innerHTML = 'Error al cargar asignaturas.';
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching overlay schedule:', err);
+                    subjectsList.innerHTML = 'Error de conexión.';
+                });
+                
         } else {
+            subjectsList.innerHTML = '';
+            subjectsContainer.style.display = 'none';
             btnConfirmOverlay.disabled = true;
         }
     });
@@ -342,6 +405,11 @@ function setupEventListeners() {
             overlayState.nivel = val;
             overlayState.seccion = '';
         }
+        
+        // Collect excluded subjects
+        const unchecked = document.querySelectorAll('.overlay-subject-chk:not(:checked)');
+        overlayState.exclude = Array.from(unchecked).map(chk => chk.value);
+
         
         overlayModal.style.display = 'none';
         btnClearOverlay.style.display = 'flex';
@@ -1034,6 +1102,9 @@ function loadNivelSchedule(nivelStr) {
         url.searchParams.append('overlay_nivel', overlayState.nivel);
         if (overlayState.seccion) {
             url.searchParams.append('overlay_seccion', overlayState.seccion);
+        }
+        if (overlayState.exclude && overlayState.exclude.length > 0) {
+            url.searchParams.append('overlay_exclude', overlayState.exclude.join('|'));
         }
     }
     
