@@ -387,6 +387,8 @@
                     <div class="timetable-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
                         <h3 id="nivel-schedule-title"><i class="fa-solid fa-calendar-days"></i> Horario de Cursos por Nivel Académico</h3>
                         <div style="display: flex; gap: 10px;">
+                            <button class="btn" id="btn-import-overlay" style="background: var(--primary-color); color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-code-compare"></i> Importar Horario</button>
+                            <button class="btn" id="btn-clear-overlay" style="background: #e2e8f0; color: #475569; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; display: none; align-items: center; gap: 6px;"><i class="fa-solid fa-xmark"></i> Limpiar Importación</button>
                             <button class="btn-pdf" id="btn-pdf-nivel"><i class="fa-solid fa-file-pdf"></i> Exportar Nivel Actual</button>
                             <button class="btn-pdf" id="btn-pdf-all-niveles" style="background: var(--secondary-color);"><i class="fa-solid fa-file-pdf"></i> Exportar Todos</button>
                         </div>
@@ -395,6 +397,34 @@
                         <!-- Timetable Grid will be generated here -->
                     </div>
                 </div>
+
+                <!-- Overlay Modal -->
+                <div id="overlay-modal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center;">
+                    <div class="modal-content" style="background-color: white; padding: 30px; border-radius: 8px; width: 400px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+                        <h3 style="margin-top: 0; color: var(--primary-color);"><i class="fa-solid fa-code-compare"></i> Importar Horario</h3>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 20px;">Superpón las asignaturas de otra carrera para visualizar cruces y disponibilidad.</p>
+                        
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 5px; color: var(--text-primary);">Carrera a Importar</label>
+                            <select id="overlay-carrera" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px;">
+                                <option value="">-- Seleccionar Carrera --</option>
+                            </select>
+                        </div>
+
+                        <div style="margin-bottom: 25px;">
+                            <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 5px; color: var(--text-primary);">Nivel / Grupo a Importar</label>
+                            <select id="overlay-nivel" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px;" disabled>
+                                <option value="">-- Seleccionar Carrera Primero --</option>
+                            </select>
+                        </div>
+
+                        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                            <button id="btn-cancel-overlay" style="padding: 8px 15px; border: 1px solid var(--border-color); background: white; border-radius: 4px; cursor: pointer;">Cancelar</button>
+                            <button id="btn-confirm-overlay" style="padding: 8px 15px; border: none; background: var(--primary-color); color: white; border-radius: 4px; cursor: pointer;" disabled>Importar y Ver</button>
+                        </div>
+                    </div>
+                </div>
+
             </section>
 
             <!-- TAB: SALAS -->

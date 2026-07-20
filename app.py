@@ -665,82 +665,105 @@ def get_schedule():
         if cursor.fetchone()[0] == 0:
             return jsonify({'success': True, 'empty': True})
             
-        # We need rows with day and hour information
-        query = """
-            SELECT NRC, NRC_PADRE, TITULO, MATERIA, CURSO, SECCION, TIPO_HORARIO, DOCENTE, 
-                   COD_SALON, SALON, EDIFICIO, NIVEL, CARRERA, JORNADA,
-                   LUNES, MARTES, MIERCOLES, JUEVES, VIERNES, SABADO, DOMINGO,
-                   HORA_INCIO, HORA_FIN
-            FROM planificacion
-            WHERE HORA_INCIO IS NOT NULL AND HORA_INCIO != ''
-                  AND (LUNES='Y' OR MARTES='Y' OR MIERCOLES='Y' OR JUEVES='Y' OR VIERNES='Y' OR SABADO='Y' OR DOMINGO='Y')
-        """
-        conditions = []
-        params = []
-        
-        if docente:
-            conditions.append("DOCENTE = ?")
-            params.append(docente)
-        if nivel:
-            conditions.append("NIVEL = ?")
-            params.append(int(nivel))
-        if seccion:
-            try:
-                sec_idx = int(seccion) - 1
-                
-                # We need to respect the carrera filter when determining the Nth section!
-                parent_query = """
-                    SELECT DISTINCT NRC, MATERIA, CURSO, SECCION
-                    FROM planificacion 
-                    WHERE (NIVEL = ? OR ? IS NULL) AND (NRC_PADRE IS NULL OR NRC_PADRE = '')
-                """
-                parent_params = [int(nivel) if nivel else None, nivel]
-                
-                if carrera:
-                    parent_query += " AND CARRERA = ?"
-                    parent_params.append(carrera)
-                
-                parent_query += " ORDER BY MATERIA, CURSO, SECCION"
-                
-                cursor.execute(parent_query, parent_params)
-                
-                # Group by subject and pick the Nth NRC
-                from collections import defaultdict
-                subject_nrcs = defaultdict(list)
-                for r in cursor.fetchall():
-                    subj_key = f"{r['MATERIA']}_{r['CURSO']}"
-                    subject_nrcs[subj_key].append(r['NRC'])
-                
-                parent_nrcs = []
-                for subj, nrc_list in subject_nrcs.items():
-                    if sec_idx < len(nrc_list):
-                        parent_nrcs.append(nrc_list[sec_idx])
-                
-                if parent_nrcs:
-                    placeholders = ','.join(['?'] * len(parent_nrcs))
-                    conditions.append(f"(NRC IN ({placeholders}) OR NRC_PADRE IN ({placeholders}))")
-                    params.extend(parent_nrcs)
-                    params.extend(parent_nrcs)
-                else:
-                    conditions.append("1 = 0") # Impossible condition since no parents match this group
-            except ValueError:
-                conditions.append("SECCION = ?")
-                params.append(seccion)
-        if sala:
-            conditions.append("COD_SALON = ?")
-            params.append(sala)
-        if carrera:
-            conditions.append("CARRERA = ?")
-            params.append(carrera)
-        if jornada:
-            conditions.append("JORNADA = ?")
-            params.append(jornada)
+        def fetch_schedule_rows(docente_val, nivel_val, seccion_val, sala_val, carrera_val, jornada_val):
+            query = """
+                SELECT NRC, NRC_PADRE, TITULO, MATERIA, CURSO, SECCION, TIPO_HORARIO, DOCENTE, 
+                       COD_SALON, SALON, EDIFICIO, NIVEL, CARRERA, JORNADA,
+                       LUNES, MARTES, MIERCOLES, JUEVES, VIERNES, SABADO, DOMINGO,
+                       HORA_INCIO, HORA_FIN
+                FROM planificacion
+                WHERE HORA_INCIO IS NOT NULL AND HORA_INCIO != ''
+                      AND (LUNES='Y' OR MARTES='Y' OR MIERCOLES='Y' OR JUEVES='Y' OR VIERNES='Y' OR SABADO='Y' OR DOMINGO='Y')
+            """
+            conditions = []
+            params = []
             
-        if conditions:
-            query += " AND " + " AND ".join(conditions)
+            if docente_val:
+                conditions.append("DOCENTE = ?")
+                params.append(docente_val)
+            if nivel_val:
+                conditions.append("NIVEL = ?")
+                params.append(int(nivel_val))
+            if seccion_val:
+                try:
+                    sec_idx = int(seccion_val) - 1
+                    parent_query = """
+                        SELECT DISTINCT NRC, MATERIA, CURSO, SECCION
+                        FROM planificacion 
+                        WHERE (NIVEL = ? OR ? IS NULL) AND (NRC_PADRE IS NULL OR NRC_PADRE = '')
+                    """
+                    parent_params = [int(nivel_val) if nivel_val else None, nivel_val]
+                    
+                    if carrera_val:
+                        parent_query += " AND CARRERA = ?"
+                        parent_params.append(carrera_val)
+                    
+                    parent_query += " ORDER BY MATERIA, CURSO, SECCION"
+                    cursor.execute(parent_query, parent_params)
+                    
+                    from collections import defaultdict
+                    subject_nrcs = defaultdict(list)
+                    for r in cursor.fetchall():
+                        subj_key = f"{r['MATERIA']}_{r['CURSO']}"
+                        subject_nrcs[subj_key].append(r['NRC'])
+                    
+                    parent_nrcs = []
+                    for subj, nrc_list in subject_nrcs.items():
+                        if sec_idx < len(nrc_list):
+                            parent_nrcs.append(nrc_list[sec_idx])
+                    
+                    if parent_nrcs:
+                        placeholders = ','.join(['?'] * len(parent_nrcs))
+                        conditions.append(f"(NRC IN ({placeholders}) OR NRC_PADRE IN ({placeholders}))")
+                        params.extend(parent_nrcs)
+                        params.extend(parent_nrcs)
+                    else:
+                        conditions.append("1 = 0")
+                except ValueError:
+                    conditions.append("SECCION = ?")
+                    params.append(seccion_val)
+            if sala_val:
+                conditions.append("COD_SALON = ?")
+                params.append(sala_val)
+            if carrera_val:
+                conditions.append("CARRERA = ?")
+                params.append(carrera_val)
+            if jornada_val:
+                conditions.append("JORNADA = ?")
+                params.append(jornada_val)
+                
+            if conditions:
+                query += " AND " + " AND ".join(conditions)
+                
+            cursor.execute(query, params)
+            return [dict(r) for r in cursor.fetchall()]
+
+        # Primary rows
+        rows = fetch_schedule_rows(docente, nivel, seccion, sala, carrera, jornada)
+        for r in rows:
+            r['is_overlay'] = False
             
-        cursor.execute(query, params)
-        rows = [dict(r) for r in cursor.fetchall()]
+        # Overlay rows
+        overlay_carrera = request.args.get('overlay_carrera')
+        overlay_nivel = request.args.get('overlay_nivel')
+        if overlay_carrera and overlay_nivel:
+            overlay_seccion = request.args.get('overlay_seccion')
+            overlay_rows = fetch_schedule_rows(docente, overlay_nivel, overlay_seccion, sala, overlay_carrera, jornada)
+            for r in overlay_rows:
+                r['is_overlay'] = True
+            
+            # Combine without duplicates (same NRC and same time blocks)
+            # A combination of NRC + LUNES + HORA_INCIO is usually unique for a block
+            seen = set()
+            for r in rows:
+                key = (r['NRC'], r['LUNES'], r['MARTES'], r['MIERCOLES'], r['JUEVES'], r['VIERNES'], r['SABADO'], r['HORA_INCIO'])
+                seen.add(key)
+                
+            for r in overlay_rows:
+                key = (r['NRC'], r['LUNES'], r['MARTES'], r['MIERCOLES'], r['JUEVES'], r['VIERNES'], r['SABADO'], r['HORA_INCIO'])
+                if key not in seen:
+                    rows.append(r)
+                    seen.add(key)
         
         # Identify subgroups within families (e.g. multiple LABs for the same parent)
         from collections import defaultdict

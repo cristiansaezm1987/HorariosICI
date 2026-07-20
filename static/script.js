@@ -12,6 +12,13 @@ let allAsignaturas = []; // raw data for client-side filtering
 let selectedDocente = null;
 let selectedSala = null;
 let selectedNivel = '';
+let allFiltersData = null; // Store global filters data for the overlay modal
+let overlayState = {
+    active: false,
+    carrera: '',
+    nivel: '',
+    seccion: ''
+};
 // Track Chart.js instances so they can be destroyed on re-render
 let chartInstances = {};
 
@@ -237,6 +244,108 @@ function setupEventListeners() {
         }
     });
 
+    // --- Overlay Modal Logic ---
+    const overlayModal = document.getElementById('overlay-modal');
+    const overlayCarreraSelect = document.getElementById('overlay-carrera');
+    const overlayNivelSelect = document.getElementById('overlay-nivel');
+    const btnConfirmOverlay = document.getElementById('btn-confirm-overlay');
+    const btnClearOverlay = document.getElementById('btn-clear-overlay');
+
+    document.getElementById('btn-import-overlay').addEventListener('click', () => {
+        // Populate Carrera Dropdown if not already done
+        if (allFiltersData && overlayCarreraSelect.options.length === 1) {
+            allFiltersData.carreras.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = c;
+                overlayCarreraSelect.appendChild(opt);
+            });
+        }
+        overlayModal.style.display = 'flex';
+    });
+
+    document.getElementById('btn-cancel-overlay').addEventListener('click', () => {
+        overlayModal.style.display = 'none';
+    });
+
+    overlayCarreraSelect.addEventListener('change', (e) => {
+        const selected = e.target.value;
+        overlayNivelSelect.innerHTML = '<option value="">-- Seleccionar Nivel --</option>';
+        if (selected && allFiltersData) {
+            overlayNivelSelect.disabled = false;
+            // Note: Since allFiltersData.niveles applies globally, we can just populate it 
+            // the same way we do for the main filter
+            if (allFiltersData.niveles && allFiltersData.niveles_secciones) {
+                allFiltersData.niveles.forEach(n => {
+                    const optGroup = document.createElement('option');
+                    optGroup.value = n;
+                    optGroup.textContent = `Nivel ${n} (Todas las Secciones)`;
+                    optGroup.style.fontWeight = 'bold';
+                    overlayNivelSelect.appendChild(optGroup);
+                    
+                    const sectionsForLevel = allFiltersData.niveles_secciones.filter(ns => ns.nivel === n);
+                    if (sectionsForLevel.length > 1) {
+                        sectionsForLevel.forEach(ns => {
+                            const opt = document.createElement('option');
+                            opt.value = `${n}|${ns.seccion}`;
+                            opt.innerHTML = `&nbsp;&nbsp;&nbsp;↳ Nivel ${n} - Grupo ${ns.seccion}`;
+                            overlayNivelSelect.appendChild(opt);
+                        });
+                    }
+                });
+            }
+            btnConfirmOverlay.disabled = true; // Wait for Nivel selection
+        } else {
+            overlayNivelSelect.disabled = true;
+            btnConfirmOverlay.disabled = true;
+        }
+    });
+
+    overlayNivelSelect.addEventListener('change', (e) => {
+        if (e.target.value) {
+            btnConfirmOverlay.disabled = false;
+        } else {
+            btnConfirmOverlay.disabled = true;
+        }
+    });
+
+    btnConfirmOverlay.addEventListener('click', () => {
+        overlayState.active = true;
+        overlayState.carrera = overlayCarreraSelect.value;
+        const val = overlayNivelSelect.value;
+        if (val.includes('|')) {
+            const [n, s] = val.split('|');
+            overlayState.nivel = n;
+            overlayState.seccion = s;
+        } else {
+            overlayState.nivel = val;
+            overlayState.seccion = '';
+        }
+        
+        overlayModal.style.display = 'none';
+        btnClearOverlay.style.display = 'flex';
+        showToast(`Importando horario de ${overlayState.carrera}...`, 'info');
+        if (selectedNivel) {
+            loadNivelSchedule(selectedNivel);
+        }
+    });
+
+    btnClearOverlay.addEventListener('click', () => {
+        overlayState.active = false;
+        overlayState.carrera = '';
+        overlayState.nivel = '';
+        overlayState.seccion = '';
+        btnClearOverlay.style.display = 'none';
+        overlayCarreraSelect.value = '';
+        overlayNivelSelect.value = '';
+        overlayNivelSelect.disabled = true;
+        btnConfirmOverlay.disabled = true;
+        showToast('Importación limpiada.', 'info');
+        if (selectedNivel) {
+            loadNivelSchedule(selectedNivel);
+        }
+    });
+
     // PDF export buttons
     document.getElementById('btn-pdf-asignaturas').addEventListener('click', () => {
         exportPDF('asignaturas');
@@ -372,7 +481,9 @@ function loadGlobalFilters() {
     fetch('/api/filters')
         .then(res => res.json())
         .then(data => {
-            if (data.success && !data.empty) {
+            if (data.success) {
+                allFiltersData = data; // Save for overlay modal use
+                
                 // Carrera filter
                 const selectCarrera = document.getElementById('filter-carrera');
                 const prevCarreraVal = selectCarrera.value;
@@ -893,6 +1004,14 @@ function loadNivelSchedule(nivelStr) {
     if (globalFilters.carrera) url.searchParams.append('carrera', globalFilters.carrera);
     if (globalFilters.jornada) url.searchParams.append('jornada', globalFilters.jornada);
     
+    if (overlayState.active) {
+        url.searchParams.append('overlay_carrera', overlayState.carrera);
+        url.searchParams.append('overlay_nivel', overlayState.nivel);
+        if (overlayState.seccion) {
+            url.searchParams.append('overlay_seccion', overlayState.seccion);
+        }
+    }
+    
     fetch(url)
         .then(res => res.json())
         .then(data => {
@@ -1062,6 +1181,12 @@ function renderTimetable(containerId, scheduleData, viewType) {
                     card.style.setProperty('background-color', bgCol, 'important');
                     card.style.setProperty('border-left-color', borderCol, 'important');
                     
+                    if (m.is_overlay) {
+                        card.style.border = `2px dashed ${borderCol}`;
+                        card.style.opacity = '0.9';
+                        card.style.backgroundImage = 'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.5) 10px, rgba(255,255,255,0.5) 20px)';
+                    }
+                    
                     // Visual cascade for overlapping sections
                     if (index > 0) {
                         card.style.marginLeft = `${index * 12}px`;
@@ -1096,6 +1221,9 @@ function renderTimetable(containerId, scheduleData, viewType) {
                     let badgeHtml = '';
                     if (m.subgrupo) {
                         badgeHtml = `<span class="block-badge-type" style="background-color: var(--text-primary); color: white;">Grupo ${m.subgrupo}</span> `;
+                    }
+                    if (m.is_overlay) {
+                        badgeHtml += `<span class="block-badge-type" style="background-color: var(--secondary-color); color: white;"><i class="fa-solid fa-code-compare"></i> Importado (${m.CARRERA})</span> `;
                     }
                     card.innerHTML = `
                         <span class="block-subject meta-subject">${m.TITULO} ${badgeHtml}<span class="block-badge-type meta-tipo ${typeClass}">${tipoText}</span></span>
