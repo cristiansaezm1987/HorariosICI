@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planificación Académica - Universidad Autónoma de Chile</title>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Top Corporate Header -->
+    <header class="main-header">
+        <div class="header-logo">
+            <span class="logo-text">UNIVERSIDAD <span class="logo-highlight">AUTONOMA</span> DE CHILE</span>
+            <span class="logo-subtext">SISTEMA DE PLANIFICACIÓN Y DISTRIBUCIÓN</span>
+        </div>
+        <div class="header-status" id="load-status">
+            <i class="fa-solid fa-circle-notch fa-spin"></i> Verificando datos...
+        </div>
+    </header>
+
+    <!-- App Container -->
+    <div class="app-container">
+        
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <nav class="nav-menu">
+                <button class="nav-item active" data-tab="dashboard">
+                    <i class="fa-solid fa-chart-line"></i> Dashboard General
+                </button>
+                <button class="nav-item" data-tab="asignaturas">
+                    <i class="fa-solid fa-book-bookmark"></i> Asignaturas (NRC)
+                </button>
+                <button class="nav-item" data-tab="docentes">
+                    <i class="fa-solid fa-chalkboard-user"></i> Docentes
+                </button>
+                <button class="nav-item" data-tab="niveles">
+                    <i class="fa-solid fa-layer-group"></i> Horarios por Nivel
+                </button>
+                <button class="nav-item" data-tab="salas">
+                    <i class="fa-solid fa-door-open"></i> Salas y Disponibilidad
+                </button>
+            </nav>
+
+            <!-- File Upload Section -->
+            <div class="upload-box">
+                <h4><i class="fa-solid fa-file-csv"></i> Cargar Planificación</h4>
+                <p>Sube el archivo CSV del sistema para actualizar la planificación.</p>
+                <form id="upload-form">
+                    <input type="file" id="csv-file-input" accept=".csv" style="display: none;">
+                    <button type="button" class="btn-primary" id="btn-select-file">
+                        <i class="fa-solid fa-file-import"></i> Seleccionar Archivo
+                    </button>
+                    <div id="file-name-display" class="file-name-text"></div>
+                </form>
+                <div class="upload-progress" id="upload-progress" style="display: none;">
+                    <div class="progress-bar-fill"></div>
+                </div>
+            </div>
+            
+            <!-- Global Sidebar Filters (Real-time updates) -->
+            <div class="sidebar-filters card">
+                <h3><i class="fa-solid fa-filter"></i> Filtros Globales</h3>
+                
+                <div class="filter-group">
+                    <label for="filter-carrera">Carrera</label>
+                    <select id="filter-carrera">
+                        <option value="">Todas las carreras</option>
+                    </select>
+                </div>
+                
+                <div class="filter-group">
+                    <label for="filter-jornada">Jornada</label>
+                    <select id="filter-jornada">
+                        <option value="">Todas</option>
+                    </select>
+                </div>
+                
+                <button class="btn-secondary" id="btn-clear-filters">
+                    <i class="fa-solid fa-filter-circle-xmark"></i> Limpiar Filtros
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="content-area">
+            
+            <!-- EMPTY DATA STATE WARNING -->
+            <div id="empty-state" class="empty-state card" style="display: none;">
+                <div class="empty-state-icon">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <h2>Sin Datos de Planificación</h2>
+                <p>No se encontraron datos cargados en el sistema. Utiliza el botón de la barra lateral para subir el archivo CSV de planificación proporcionado por el sistema universitario.</p>
+            </div>
+
+            <!-- TABS -->
+            
+            <!-- TAB: DASHBOARD -->
+            <section id="tab-dashboard" class="tab-content active">
+                <div class="dashboard-grid">
+                    
+                    <!-- Metrics Row -->
+                    <div class="metrics-row">
+                        <div class="metric-card card">
+                            <div class="metric-icon bg-red"><i class="fa-solid fa-book"></i></div>
+                            <div class="metric-details">
+                                <span class="metric-value" id="metric-nrcs">-</span>
+                                <span class="metric-label">Asignaturas (NRCs)</span>
+                            </div>
+                        </div>
+                        <div class="metric-card card">
+                            <div class="metric-icon bg-blue"><i class="fa-solid fa-user-tie"></i></div>
+                            <div class="metric-details">
+                                <span class="metric-value" id="metric-docentes">-</span>
+                                <span class="metric-label">Docentes Activos</span>
+                            </div>
+                        </div>
+                        <div class="metric-card card">
+                            <div class="metric-icon bg-green"><i class="fa-solid fa-school"></i></div>
+                            <div class="metric-details">
+                                <span class="metric-value" id="metric-salas">-</span>
+                                <span class="metric-label">Salas Utilizadas</span>
+                            </div>
+                        </div>
+                        <div class="metric-card card">
+                            <div class="metric-icon bg-yellow"><i class="fa-solid fa-clock"></i></div>
+                            <div class="metric-details">
+                                <span class="metric-value" id="metric-horas">-</span>
+                                <span class="metric-label">Horas Totales Semanales</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Enrolled vs Cupos Graphic Card -->
+                    <div class="chart-card card">
+                        <h3><i class="fa-solid fa-users"></i> Distribución de Matrícula (Cupos vs Inscritos)</h3>
+                        <div class="matricula-stats">
+                            <div class="stat-progress-container">
+                                <div class="stat-progress-label">
+                                    <span>Cupos Totales Ofertados: <strong id="val-total-cupos">-</strong></span>
+                                    <span>Inscritos Actuales: <strong id="val-total-inscritos">-</strong></span>
+                                </div>
+                                <div class="progress-bar-large">
+                                    <div class="progress-bar-fill-large" id="matricula-progress-fill" style="width: 0%"></div>
+                                </div>
+                                <div class="stat-progress-sub">
+                                    <span id="matricula-percentage">- % de ocupación de cupos</span>
+                                    <span>Disponibles: <strong id="val-total-disponibles">-</strong></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Details Row -->
+                    <div class="dashboard-details-row">
+                        <!-- Left Panel: Component types -->
+                        <div class="card panel-card">
+                            <h3><i class="fa-solid fa-shapes"></i> Componentes y Horarios</h3>
+                            <p class="panel-subtitle">Desglose de secciones por tipo de clase dictada</p>
+                            <div class="component-list" id="component-breakdown-list">
+                                <!-- Dynamic breakdown items -->
+                            </div>
+                        </div>
+                        
+                        <!-- Right Panel: Occupancy by building -->
+                        <div class="card panel-card">
+                            <h3><i class="fa-solid fa-building"></i> Clases por Edificio</h3>
+                            <p class="panel-subtitle">Distribución del uso de infraestructura universitaria</p>
+                            <div class="building-list" id="building-breakdown-list">
+                                <!-- Dynamic building items -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: ASIGNATURAS -->
+            <section id="tab-asignaturas" class="tab-content">
+                <div class="card table-card">
+                    <div class="table-header">
+                        <h3><i class="fa-solid fa-list-check"></i> Listado y Estructura de Asignaturas</h3>
+                        <div class="search-box">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="search-asignatura" placeholder="Buscar por asignatura, código o NRC...">
+                        </div>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="data-table" id="table-asignaturas">
+                            <thead>
+                                <tr>
+                                    <th width="40px"></th>
+                                    <th width="80px">NRC</th>
+                                    <th width="120px">Código</th>
+                                    <th>Título Asignatura</th>
+                                    <th width="80px">Sección</th>
+                                    <th width="80px">Horas</th>
+                                    <th width="90px">Tipo</th>
+                                    <th width="90px">Cupos</th>
+                                    <th width="90px">Inscritos</th>
+                                    <th width="90px">Disponibles</th>
+                                    <th>Docente a Cargo</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-asignaturas">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: DOCENTES -->
+            <section id="tab-docentes" class="tab-content">
+                <div class="split-view">
+                    
+                    <!-- Left List -->
+                    <div class="list-panel card">
+                        <div class="search-box select-search">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="search-docente" placeholder="Filtrar docentes por nombre...">
+                        </div>
+                        <div class="item-list" id="list-docentes">
+                            <!-- Dynamic list of teachers -->
+                        </div>
+                    </div>
+                    
+                    <!-- Right Details and Calendar -->
+                    <div class="details-panel">
+                        <!-- Profile Card -->
+                        <div class="card profile-card" id="docente-profile-card">
+                            <div class="profile-header">
+                                <div class="profile-avatar"><i class="fa-solid fa-user-tie"></i></div>
+                                <div class="profile-title">
+                                    <h2 id="docente-name">Seleccione un Docente</h2>
+                                    <span id="docente-cargo" class="badge">N/A</span>
+                                    <span id="docente-grado" class="badge bg-blue-badge">N/A</span>
+                                </div>
+                            </div>
+                            <div class="profile-details-grid">
+                                <div class="profile-detail">
+                                    <span class="detail-title">ID/Rut Docente</span>
+                                    <span class="detail-value" id="docente-id">-</span>
+                                </div>
+                                <div class="profile-detail">
+                                    <span class="detail-title">Tipo Contrato</span>
+                                    <span class="detail-value" id="docente-contrato">-</span>
+                                </div>
+                                <div class="profile-detail">
+                                    <span class="detail-title">Jerarquía Académica</span>
+                                    <span class="detail-value" id="docente-jerarquia">-</span>
+                                </div>
+                                <div class="profile-detail">
+                                    <span class="detail-title">Sede de Origen</span>
+                                    <span class="detail-value" id="docente-sede">-</span>
+                                </div>
+                                <div class="profile-detail highlight-detail">
+                                    <span class="detail-title">Carga Horaria Semanal</span>
+                                    <span class="detail-value" id="docente-horas">- hrs</span>
+                                </div>
+                                <div class="profile-detail highlight-detail">
+                                    <span class="detail-title">NRCs Asignados</span>
+                                    <span class="detail-value" id="docente-nrc-count">- asignaturas</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Timetable Grid -->
+                        <div class="card timetable-card mt-4">
+                            <h3><i class="fa-solid fa-calendar-days"></i> Horario Semanal del Docente</h3>
+                            <div class="timetable-container" id="docente-timetable">
+                                <!-- Timetable Grid will be generated here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: NIVELES -->
+            <section id="tab-niveles" class="tab-content">
+                <div class="control-card card">
+                    <div class="selection-row">
+                        <div class="select-group">
+                            <label for="select-nivel">Seleccione Nivel / Semestre</label>
+                            <select id="select-nivel">
+                                <option value="">-- Seleccionar Nivel --</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card timetable-card mt-4" id="nivel-schedule-card" style="display: none;">
+                    <h3><i class="fa-solid fa-calendar-days"></i> Horario de Cursos por Nivel Académico</h3>
+                    <div class="timetable-container" id="nivel-timetable">
+                        <!-- Timetable Grid will be generated here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB: SALAS -->
+            <section id="tab-salas" class="tab-content">
+                <div class="split-view">
+                    
+                    <!-- Left List of Rooms -->
+                    <div class="list-panel card">
+                        <div class="search-box select-search">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="search-sala" placeholder="Filtrar salas por código...">
+                        </div>
+                        <div class="item-list" id="list-salas">
+                            <!-- Dynamic list of rooms -->
+                        </div>
+                    </div>
+                    
+                    <!-- Right Details and Grid -->
+                    <div class="details-panel">
+                        <!-- Room Profile Card -->
+                        <div class="card profile-card" id="sala-profile-card">
+                            <div class="profile-header">
+                                <div class="profile-avatar"><i class="fa-solid fa-door-open"></i></div>
+                                <div class="profile-title">
+                                    <h2 id="sala-name">Seleccione una Sala</h2>
+                                    <span id="sala-edificio" class="badge">N/A</span>
+                                    <span id="sala-capacidad" class="badge bg-green-badge">Capacidad: N/A</span>
+                                </div>
+                            </div>
+                            <div class="profile-details-grid">
+                                <div class="profile-detail">
+                                    <span class="detail-title">Código Interno</span>
+                                    <span class="detail-value" id="sala-codigo">-</span>
+                                </div>
+                                <div class="profile-detail">
+                                    <span class="detail-title">Edificio / Ubicación</span>
+                                    <span class="detail-value" id="sala-ubicacion">-</span>
+                                </div>
+                                <div class="profile-detail highlight-detail">
+                                    <span class="detail-title">Bloques Ocupados</span>
+                                    <span class="detail-value" id="sala-bloques-ocupados">- bloques/semana</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Room Grid -->
+                        <div class="card timetable-card mt-4">
+                            <h3><i class="fa-solid fa-calendar-check"></i> Distribución de Clases y Disponibilidad</h3>
+                            <p class="timetable-subtitle">Muestra los horarios asignados y la disponibilidad semanal de esta sala</p>
+                            <div class="timetable-container" id="sala-timetable">
+                                <!-- Timetable Grid will be generated here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
