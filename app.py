@@ -191,8 +191,8 @@ def get_summary():
         if total_rows == 0:
             return jsonify({'success': True, 'empty': True})
             
-        # Total unique subjects (by NRC) - parent NRCs only
-        cursor.execute("SELECT COUNT(DISTINCT NRC) FROM planificacion WHERE NRC_PADRE IS NULL OR TRIM(NRC_PADRE) = ''")
+        # Total unique subjects (by NRC) - parent TEO NRCs only
+        cursor.execute("SELECT COUNT(DISTINCT NRC) FROM planificacion WHERE TIPO_HORARIO = 'TEO' AND (NRC_PADRE IS NULL OR TRIM(NRC_PADRE) = '')")
         total_nrcs = cursor.fetchone()[0]
         
         # Total unique Docentes
@@ -484,7 +484,7 @@ def get_docentes():
             
             # Subquery to get distinct NRCs for this teacher and their properties, calculating weekly blocks as HORAS_TOTALES
             cursor.execute("""
-                SELECT NRC, TITULO, MATERIA, CURSO, SECCION, 
+                SELECT NRC, NRC_PADRE, TITULO, MATERIA, CURSO, SECCION, 
                        (SUM(CASE WHEN LUNES='Y' THEN 1 ELSE 0 END) +
                         SUM(CASE WHEN MARTES='Y' THEN 1 ELSE 0 END) +
                         SUM(CASE WHEN MIERCOLES='Y' THEN 1 ELSE 0 END) +
@@ -501,7 +501,15 @@ def get_docentes():
             
             t['asignaturas'] = subjects
             t['total_horas'] = sum(s['HORAS_TOTALES'] or 0 for s in subjects if s['TIPO_HORARIO'] != 'APM')
-            t['n_asignaturas'] = len(subjects)
+            
+            # Count unique TEO parent NRCs
+            teo_parents = [s for s in subjects if s['TIPO_HORARIO'] == 'TEO' and (s['NRC_PADRE'] is None or s['NRC_PADRE'].strip() == '')]
+            if len(teo_parents) > 0:
+                t['n_asignaturas'] = len(teo_parents)
+            else:
+                # Fallback to unique non-APM NRCs if they only teach AYU/LAB/TER
+                non_apm_subjects = [s for s in subjects if s['TIPO_HORARIO'] != 'APM']
+                t['n_asignaturas'] = len(non_apm_subjects)
             
         return jsonify({
             'success': True,
