@@ -2298,7 +2298,9 @@ async function sendDocumentosEmail() {
     } catch (err) {}
     try {
         const filePromises = documentosInstitucionales.map(async doc => {
-            const url = `/documentos/${doc.path.replace(/\\/g, '/')}`;
+            const pathParts = doc.path.replace(/\\/g, '/').split('/');
+            const encodedPath = pathParts.map(p => encodeURIComponent(p)).join('/');
+            const url = `/documentos/${encodedPath}`;
             const res = await fetch(url);
             if (!res.ok) throw new Error(`Failed to fetch ${doc.filename}`);
             const blob = await res.blob();
@@ -2401,7 +2403,9 @@ Un cordial saludo y que sea un exitoso semestre Primavera 2026.`;
         // 3. Documentos
         if (documentosInstitucionales && documentosInstitucionales.length > 0) {
             const docPromises = documentosInstitucionales.map(async doc => {
-                const url = `/documentos/${doc.path.replace(/\\/g, '/')}`;
+                const pathParts = doc.path.replace(/\\/g, '/').split('/');
+                const encodedPath = pathParts.map(p => encodeURIComponent(p)).join('/');
+                const url = `/documentos/${encodedPath}`;
                 const res = await fetch(url);
                 if (!res.ok) throw new Error(`Failed to fetch ${doc.filename}`);
                 const blob = await res.blob();
