@@ -25,6 +25,7 @@ let chartInstances = {};
 // Asignaturas filter state
 let asignaturaFilters = {
     query: '',
+    nivel: '',
     tipo: '',
     seccion: '',
     sort: ''
@@ -224,6 +225,14 @@ function setupEventListeners() {
     });
 
     // Advanced asignatura filters
+    const filterNivel = document.getElementById('filter-asignatura-nivel');
+    if (filterNivel) {
+        filterNivel.addEventListener('change', (e) => {
+            asignaturaFilters.nivel = e.target.value;
+            applyAsignaturaFilters();
+        });
+    }
+
     document.getElementById('filter-asignatura-tipo').addEventListener('change', (e) => {
         asignaturaFilters.tipo = e.target.value;
         applyAsignaturaFilters();
@@ -818,12 +827,28 @@ function loadAsignaturas() {
         .then(data => {
             if (data.success && !data.empty) {
                 allAsignaturas = data.asignaturas;
+                
+                // Populate Nivel dropdown
+                const filterNivel = document.getElementById('filter-asignatura-nivel');
+                if (filterNivel) {
+                    const uniqueLevels = [...new Set(allAsignaturas.map(a => a.NIVEL).filter(Boolean))].sort((a, b) => parseInt(a) - parseInt(b));
+                    filterNivel.innerHTML = '<option value="">Todos los niveles</option>';
+                    uniqueLevels.forEach(lvl => {
+                        const opt = document.createElement('option');
+                        opt.value = lvl;
+                        opt.textContent = `Nivel ${lvl}`;
+                        filterNivel.appendChild(opt);
+                    });
+                }
+                
                 // Reset advanced filters when global filters change
                 asignaturaFilters.query = '';
+                asignaturaFilters.nivel = '';
                 asignaturaFilters.tipo = '';
                 asignaturaFilters.seccion = '';
                 asignaturaFilters.sort = '';
                 document.getElementById('search-asignatura').value = '';
+                document.getElementById('filter-asignatura-nivel').value = '';
                 document.getElementById('filter-asignatura-tipo').value = '';
                 document.getElementById('filter-asignatura-seccion').value = '';
                 document.getElementById('sort-asignaturas').value = '';
@@ -835,7 +860,7 @@ function loadAsignaturas() {
 
 // Apply all client-side asignatura filters and sorting
 function applyAsignaturaFilters() {
-    const { query, tipo, seccion, sort } = asignaturaFilters;
+    const { query, nivel, tipo, seccion, sort } = asignaturaFilters;
     const q = query.toLowerCase().trim();
     const sec = seccion.toLowerCase().trim();
 
@@ -857,10 +882,11 @@ function applyAsignaturaFilters() {
             (item.DOCENTE && item.DOCENTE.toLowerCase().includes(q)) ||
             (item.SECCION && item.SECCION.toLowerCase().includes(q));
 
+        const matchNivel = !nivel || (item.NIVEL && String(item.NIVEL) === String(nivel));
         const matchTipo = !tipo || (item.TIPO_HORARIO && item.TIPO_HORARIO === tipo);
         const matchSeccion = !sec || (item.SECCION && item.SECCION.toLowerCase().includes(sec));
 
-        return matchQuery && matchTipo && matchSeccion;
+        return matchQuery && matchNivel && matchTipo && matchSeccion;
     });
 
     // Sort

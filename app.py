@@ -548,8 +548,14 @@ def get_asignaturas():
             p_copy['componentes_hijo'] = children_by_parent.get(p_nrc, [])
             result.append(p_copy)
             
-        # Sort by subject code (Materia + Curso) and Section
-        result.sort(key=lambda x: (x.get('MATERIA') or '', x.get('CURSO') or '', x.get('SECCION') or ''))
+        # Sort by Level, then Subject Code (Materia + Curso) and Section
+        def safe_int(val):
+            try:
+                return int(val)
+            except:
+                return 9999
+                
+        result.sort(key=lambda x: (safe_int(x.get('NIVEL')), x.get('MATERIA') or '', x.get('CURSO') or '', x.get('SECCION') or ''))
         
         return jsonify({
             'success': True,
