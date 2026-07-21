@@ -1363,3 +1363,38 @@ button {
         padding-bottom: 0 !important;
     }
 }
+
+/* PDF Export compact styles */
+.exporting-pdf .timetable-cell {
+    padding: 2px !important;
+    font-size: 0.70rem !important;
+    min-height: auto !important;
+}
+.exporting-pdf .timetable-time {
+    padding: 2px !important;
+    font-size: 0.70rem !important;
+}
+.exporting-pdf .timetable-header-cell {
+    padding: 4px !important;
+    font-size: 0.75rem !important;
+}
+.exporting-pdf .class-card {
+    padding: 2px !important;
+    margin: 1px !important;
+}
+.exporting-pdf .class-title {
+    font-size: 0.65rem !important;
+    margin-bottom: 2px !important;
+}
+.exporting-pdf .class-details {
+    font-size: 0.60rem !important;
+}
+
+@media print {
+    .timetable-cell { padding: 2px !important; font-size: 0.70rem !important; min-height: auto !important; }
+    .timetable-time { padding: 2px !important; font-size: 0.70rem !important; }
+    .timetable-header-cell { padding: 4px !important; font-size: 0.75rem !important; }
+    .class-card { padding: 2px !important; margin: 1px !important; }
+    .class-title { font-size: 0.65rem !important; margin-bottom: 2px !important; }
+    .class-details { font-size: 0.60rem !important; }
+}

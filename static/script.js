@@ -1976,7 +1976,9 @@ async function sendScheduleEmail() {
     
     try {
         // Generate Blob
+        element.classList.add('exporting-pdf');
         const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
+        element.classList.remove('exporting-pdf');
         const file = new File([pdfBlob], opt.filename, { type: 'application/pdf' });
         
         let filesToShare = [file];
@@ -2358,7 +2360,9 @@ async function sendTodoEmail(docente) {
             html2canvas:  { scale: 2, useCORS: true },
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
         };
+        element.classList.add('exporting-pdf');
         const pdfWorker = await html2pdf().set(opt).from(element).output('blob');
+        element.classList.remove('exporting-pdf');
         allFiles.push(new File([pdfWorker], opt.filename, { type: 'application/pdf' }));
         
         // 2. Programas
