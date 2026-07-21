@@ -1242,6 +1242,8 @@ function normalizeText(text) {
     if (n.includes("dcho empresa y ambiental")) return "derecho de empresa y ambiental";
     if (n.includes("consul de emp")) return "consultoria de empresas";
     if (n.includes("adm. y direcc")) return "administracion y direccion de proyectos";
+    if (n.includes("elect. y electromagnetismo")) return "electricidad y electromagnetismo";
+    if (n.includes("medio ambiente")) return n.replace("medio ambiente", "medioambiente");
     
     return n;
 }
