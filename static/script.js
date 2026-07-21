@@ -10,6 +10,7 @@ let allDocentes = [];
 let allSalas = [];
 let allAsignaturas = []; // raw data for client-side filtering
 let programasAsignaturas = []; // fetched from /api/programas
+let documentosInstitucionales = []; // fetched from /api/documentos
 let selectedDocente = null;
 let selectedSala = null;
 let selectedNivel = '';
@@ -128,6 +129,7 @@ function checkDatabaseStatus() {
                 // Show filters and load selectors
                 loadGlobalFilters();
                 loadProgramas();
+                loadDocumentos();
                 
                 // Load current tab
                 switchTab(activeTab);
@@ -1197,6 +1199,9 @@ function selectDocente(docente) {
                 
                 // Match programs
                 matchAndRenderDocenteProgramas(data.schedule);
+                
+                // Show documentos
+                renderDocenteDocumentos();
             }
         })
         .catch(err => console.error('Error loading schedule for docente:', err));
@@ -2176,3 +2181,229 @@ function renderProgramasGrid(programas) {
         });
     });
 }
+
+async function loadDocumentos() {
+    try {
+        const response = await fetch('/api/documentos');
+        if (response.ok) {
+            documentosInstitucionales = await response.json();
+            renderDocumentosGrid(documentosInstitucionales);
+        } else {
+            const grid = document.getElementById('documentos-grid');
+            if (grid) {
+                grid.innerHTML = \<div style=\"grid-column: 1 / -1; text-align: center; padding: 40px; color: #e11d48;\"><i class=\"fa-solid fa-triangle-exclamation\"></i> Error al cargar documentos.</div>\;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading documents:', error);
+    }
+}
+
+function renderDocumentosGrid(documentos) {
+    const grid = document.getElementById('documentos-grid');
+    if (!grid) return;
+    
+    grid.innerHTML = '';
+    
+    if (documentos.length === 0) {
+        grid.innerHTML = \<div style=\"grid-column: 1 / -1; text-align: center; padding: 40px; color: #64748b;\">No se encontraron documentos en el repositorio.</div>\;
+        return;
+    }
+    
+    documentos.sort((a,b) => a.filename.localeCompare(b.filename)).forEach(doc => {
+        const card = document.createElement('div');
+        card.style.border = '1px solid var(--border-color)';
+        card.style.borderRadius = '6px';
+        card.style.padding = '15px';
+        card.style.display = 'flex';
+        card.style.alignItems = 'center';
+        card.style.gap = '15px';
+        card.style.background = '#f8fafc';
+        
+        card.innerHTML = \
+            <i class=\"fa-solid fa-file-contract\" style=\"font-size: 24px; color: var(--secondary-color);\"></i>
+            <div style=\"flex-grow: 1; min-width: 0;\">
+                <div style=\"font-weight: 500; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;\" title=\"\\">\</div>
+            </div>
+            <a href=\"/static/documentos/\\" download=\"\\" class=\"btn-pdf\" style=\"background: var(--secondary-color); padding: 6px 12px; font-size: 0.8rem; text-decoration: none;\"><i class=\"fa-solid fa-download\"></i> Descargar</a>
+        \;
+        grid.appendChild(card);
+    });
+}
+
+
+function renderDocenteDocumentos() {
+    const card = document.getElementById('docente-documentos-card');
+    const list = document.getElementById('docente-documentos-list');
+    const enviarTodoCard = document.getElementById('docente-enviar-todo-card');
+    
+    if (!card || !list || !enviarTodoCard) return;
+    
+    if (!documentosInstitucionales || documentosInstitucionales.length === 0) {
+        card.style.display = 'none';
+        enviarTodoCard.style.display = 'none';
+        return;
+    }
+    
+    list.innerHTML = '';
+    
+    documentosInstitucionales.forEach(doc => {
+        const item = document.createElement('div');
+        item.style.border = '1px solid var(--border-color)';
+        item.style.padding = '10px 15px';
+        item.style.borderRadius = '4px';
+        item.style.display = 'flex';
+        item.style.justifyContent = 'space-between';
+        item.style.alignItems = 'center';
+        item.style.background = 'white';
+        
+        item.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <i class="fa-solid fa-file-contract" style="color: var(--secondary-color); font-size: 1.2rem;"></i>
+                <span style="font-weight: 500; font-size: 0.9rem;">${doc.filename}</span>
+            </div>
+            <a href="/static/documentos/${doc.path.replace(/\\/g, '/')}" download="${doc.filename}" class="btn-pdf" style="background: var(--secondary-color); font-size: 0.8rem; padding: 4px 10px;"><i class="fa-solid fa-download"></i></a>
+        `;
+        list.appendChild(item);
+    });
+    
+    card.style.display = 'block';
+    enviarTodoCard.style.display = 'block';
+}
+
+document.getElementById('btn-email-documentos')?.addEventListener('click', async () => {
+    if (!documentosInstitucionales || documentosInstitucionales.length === 0) {
+        showToast('No hay documentos institucionales disponibles', 'error');
+        return;
+    }
+    await sendDocumentosEmail();
+});
+
+async function sendDocumentosEmail() {
+    const email = prompt('Ingrese el correo al que desea enviar los documentos institucionales:');
+    if (email === null) return;
+    
+    if (email) {
+        try {
+            await copyToClipboard(email);
+            showToast('Correo copiado al portapapeles. Pégalo en tu cliente de correo (Ctrl+V).', 'success');
+        } catch (err) {
+            console.error('Failed to copy email: ', err);
+            showToast('No se pudo copiar el correo automáticamente. Por favor, escríbelo manualmente.', 'error');
+        }
+    }
+    
+    try {
+        const filePromises = documentosInstitucionales.map(async doc => {
+            const url = `/static/documentos/${doc.path.replace(/\\/g, '/')}`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`Failed to fetch ${doc.filename}`);
+            const blob = await res.blob();
+            return new File([blob], doc.filename, { type: 'application/pdf' });
+        });
+        
+        const files = await Promise.all(filePromises);
+        
+        if (navigator.canShare && navigator.canShare({ files: files })) {
+            await navigator.share({
+                title: 'Documentos Institucionales',
+                text: 'Adjunto envío documentos institucionales.',
+                files: files
+            });
+        } else {
+            showToast('Tu navegador no soporta adjuntar múltiples archivos automáticamente (prueba en móvil o Safari/Edge modernos).', 'error');
+        }
+    } catch(err) {
+        console.error(err);
+        showToast('Error preparando los archivos: ' + err.message, 'error');
+    }
+}
+
+document.getElementById('btn-enviar-todo')?.addEventListener('click', async () => {
+    if (!selectedDocente) return;
+    await sendTodoEmail(selectedDocente);
+});
+
+async function sendTodoEmail(docente) {
+    const email = prompt('Ingrese el correo del docente para enviar todo consolidado:');
+    if (email === null) return;
+    
+    const statusToast = document.createElement('div');
+    statusToast.className = 'toast info';
+    statusToast.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Preparando todos los archivos (Horario, Programas, Documentos)...';
+    document.getElementById('toast-container').appendChild(statusToast);
+    
+    if (email) {
+        try {
+            await copyToClipboard(email);
+            showToast('Correo copiado al portapapeles. Pégalo en tu cliente de correo (Ctrl+V).', 'success');
+        } catch (err) {}
+    }
+    
+    try {
+        const allFiles = [];
+        
+        // 1. Horario
+        const element = document.getElementById('docente-timetable');
+        const opt = {
+            margin:       10,
+            filename:     `Horario_${docente.DOCENTE.replace(/ /g, '_')}.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+        };
+        const pdfWorker = await html2pdf().set(opt).from(element).output('blob');
+        allFiles.push(new File([pdfWorker], opt.filename, { type: 'application/pdf' }));
+        
+        // 2. Programas
+        const card = document.getElementById('docente-programas-card');
+        if (card.style.display !== 'none' && currentMatchedProgramas && currentMatchedProgramas.length > 0) {
+            const progPromises = currentMatchedProgramas.map(async p => {
+                const url = `/api/programas/download?path=${encodeURIComponent(p.path)}`;
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`Failed to fetch ${p.filename}`);
+                const blob = await res.blob();
+                return new File([blob], p.filename, { type: 'application/pdf' });
+            });
+            const progFiles = await Promise.all(progPromises);
+            allFiles.push(...progFiles);
+        }
+        
+        // 3. Documentos
+        if (documentosInstitucionales && documentosInstitucionales.length > 0) {
+            const docPromises = documentosInstitucionales.map(async doc => {
+                const url = `/static/documentos/${doc.path.replace(/\\/g, '/')}`;
+                const res = await fetch(url);
+                if (!res.ok) throw new Error(`Failed to fetch ${doc.filename}`);
+                const blob = await res.blob();
+                return new File([blob], doc.filename, { type: 'application/pdf' });
+            });
+            const docFiles = await Promise.all(docPromises);
+            allFiles.push(...docFiles);
+        }
+        
+        statusToast.remove();
+        
+        if (navigator.canShare && navigator.canShare({ files: allFiles })) {
+            await navigator.share({
+                title: `Consolidado Docente - ${docente.DOCENTE}`,
+                text: `Estimado/a ${docente.DOCENTE}, adjunto encontrará su horario académico, programas de asignatura y reglamentación institucional.`,
+                files: allFiles
+            });
+        } else {
+            showToast('Tu navegador no soporta adjuntar múltiples archivos automáticamente. Descarga los archivos individualmente.', 'error');
+        }
+    } catch(err) {
+        console.error(err);
+        statusToast.remove();
+        showToast('Error preparando los archivos consolidado: ' + err.message, 'error');
+    }
+}
+
+document.getElementById('search-documentos')?.addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase();
+    if (!documentosInstitucionales) return;
+    
+    const filtered = documentosInstitucionales.filter(doc => doc.filename.toLowerCase().includes(q));
+    renderDocumentosGrid(filtered);
+});

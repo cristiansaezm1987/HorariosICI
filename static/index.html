@@ -71,6 +71,9 @@
                 <button class="nav-item" data-tab="programas">
                     <i class="fa-solid fa-file-pdf"></i> Programas de Asignaturas
                 </button>
+                <button class="nav-item" data-tab="documentos">
+                    <i class="fa-solid fa-folder-open"></i> Repositorio Documentos
+                </button>
             </nav>
 
             <!-- File Upload Section -->
@@ -394,6 +397,25 @@
                             </div>
                         </div>
 
+                        <!-- Documentos Institucionales -->
+                        <div class="card mt-4" id="docente-documentos-card" style="display: none;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h3><i class="fa-solid fa-folder-open"></i> Documentos Institucionales</h3>
+                                <button class="btn-pdf" id="btn-email-documentos" style="background: var(--primary-color);"><i class="fa-solid fa-envelope"></i> Enviar Documentos</button>
+                            </div>
+                            <div id="docente-documentos-list" style="display: flex; flex-direction: column; gap: 10px;">
+                            </div>
+                        </div>
+
+                        <!-- Botón Enviar Todo -->
+                        <div class="card mt-4" id="docente-enviar-todo-card" style="display: none; background: rgba(46, 125, 50, 0.1); border-color: #2e7d32; text-align: center;">
+                            <h3 style="color: #2e7d32; margin-bottom: 10px;"><i class="fa-solid fa-paper-plane"></i> Consolidado Docente</h3>
+                            <p style="margin-bottom: 15px; font-size: 0.9rem;">Envía un correo al docente adjuntando automáticamente su Horario Semanal, los Programas de Asignatura y el Reglamento General.</p>
+                            <button id="btn-enviar-todo" style="background: #2e7d32; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 1.1rem; font-weight: bold; width: 100%;">
+                                <i class="fa-solid fa-paper-plane"></i> Enviar Todo (Horario + Programas + Reglamentos)
+                            </button>
+                        </div>
+
                         <!-- Timetable Grid -->
                         <div class="card timetable-card mt-4">
                             <div class="timetable-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -583,6 +605,24 @@
                     </div>
                 </div>
             </section>
+            
+            <!-- Tab: Documentos -->
+            <section id="tab-documentos" class="tab-content">
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2><i class="fa-solid fa-folder-open"></i> Repositorio de Documentos Institucionales</h2>
+                        <input type="text" id="search-documentos" placeholder="Buscar documento..." style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 4px; width: 300px;">
+                    </div>
+                    
+                    <div id="documentos-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px;">
+                        <!-- Documentos will be injected here via JS -->
+                        <div style="grid-column: 1 / -1; text-align: center; color: #64748b; padding: 40px;">
+                            <i class="fa-solid fa-circle-notch fa-spin"></i> Cargando documentos...
+                        </div>
+                    </div>
+                </div>
+            </section>
+
         </main>
     </div>
 
@@ -591,6 +631,6 @@
     <!-- Notification Toast -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="script.js?v=11"></script>
+    <script src="script.js?v=12"></script>
 </body>
 </html>

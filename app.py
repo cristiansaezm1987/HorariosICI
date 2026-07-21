@@ -1022,6 +1022,7 @@ def send_email():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 PROGRAMAS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'programas')
+DOCUMENTOS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'documentos')
 
 import unicodedata
 def normalize_text(text):
@@ -1063,6 +1064,24 @@ def get_programas():
                 })
     
     return jsonify(programas)
+
+@app.route('/api/documentos', methods=['GET'])
+def get_documentos():
+    if not os.path.exists(DOCUMENTOS_DIR):
+        return jsonify([])
+    
+    documentos = []
+    for root, dirs, files in os.walk(DOCUMENTOS_DIR):
+        for file in files:
+            if file.lower().endswith('.pdf'):
+                rel_path = os.path.relpath(os.path.join(root, file), DOCUMENTOS_DIR)
+                
+                documentos.append({
+                    'filename': file,
+                    'path': rel_path
+                })
+    
+    return jsonify(documentos)
 
 @app.route('/api/programas/download', methods=['GET'])
 def download_programa():
