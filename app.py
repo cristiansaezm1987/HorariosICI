@@ -4,13 +4,41 @@ import sqlite3
 import re
 import tempfile
 import shutil
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, session, redirect, url_for
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 
 app = Flask(__name__, static_folder='static', static_url_path='')
+app.secret_key = os.environ.get('SECRET_KEY', 'uautonoma_secreto_2026')
+APP_PASSWORD = os.environ.get('APP_PASSWORD', 'UAutonoma2026')
+
+@app.before_request
+def check_auth():
+    # Only protect API routes, let static files through (like index.html which has the login UI)
+    if request.path.startswith('/api/') and request.path not in ['/api/login', '/api/check-auth']:
+        if not session.get('logged_in'):
+            return jsonify({'success': False, 'message': 'No autorizado'}), 401
+
+@app.route('/api/check-auth', methods=['GET'])
+def check_auth_endpoint():
+    return jsonify({'logged_in': bool(session.get('logged_in'))})
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.json or {}
+    password = data.get('password')
+    
+    if password == APP_PASSWORD:
+        session['logged_in'] = True
+        return jsonify({'success': True, 'message': 'Inicio de sesión exitoso'})
+    return jsonify({'success': False, 'message': 'Contraseña incorrecta'}), 401
+
+@app.route('/api/logout', methods=['POST'])
+def logout():
+    session.pop('logged_in', None)
+    return jsonify({'success': True})
 
 # For Serverless environments (like Vercel), the root is read-only.
 # We copy the database to /tmp so it can be read/written during the instance lifecycle.

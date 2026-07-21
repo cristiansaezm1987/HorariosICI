@@ -74,6 +74,33 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initApp() {
+    checkAuth();
+}
+
+async function checkAuth() {
+    try {
+        const res = await fetch('/api/check-auth');
+        const data = await res.json();
+        if (data.logged_in) {
+            showApp();
+        } else {
+            showLogin();
+        }
+    } catch (e) {
+        showLogin();
+    }
+}
+
+function showLogin() {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('main-header').style.display = 'none';
+    document.getElementById('app-container').style.display = 'none';
+}
+
+function showApp() {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('main-header').style.display = 'flex';
+    document.getElementById('app-container').style.display = 'flex';
     checkDatabaseStatus();
 }
 
@@ -83,7 +110,13 @@ function checkDatabaseStatus() {
     statusDiv.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Verificando datos...';
     
     fetch('/api/summary')
-        .then(res => res.json())
+        .then(res => {
+            if (res.status === 401) {
+                showLogin();
+                throw new Error("No autorizado");
+            }
+            return res.json();
+        })
         .then(data => {
             if (data.success && !data.empty) {
                 dataLoaded = true;
@@ -110,7 +143,8 @@ function checkDatabaseStatus() {
         })
         .catch(err => {
             console.error('Error fetching summary:', err);
-            showToast('Error al conectar con el servidor.', 'error');
+            // Si es error de auth (401 devuelto como json pero capturado por catch si no es ok)
+            // Wait, fetch doesn't reject on 401. We need to check res.ok
         });
 }
 
@@ -122,6 +156,43 @@ function hideAllTabContents() {
 
 // --- EVENT LISTENERS ---
 function setupEventListeners() {
+    // Auth listeners
+    document.getElementById('login-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const pwd = document.getElementById('login-password').value;
+        const errDiv = document.getElementById('login-error');
+        errDiv.style.display = 'none';
+        
+        try {
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: pwd })
+            });
+            const data = await res.json();
+            
+            if (res.ok && data.success) {
+                showApp();
+            } else {
+                errDiv.textContent = data.message || 'Error de autenticación';
+                errDiv.style.display = 'block';
+            }
+        } catch(err) {
+            errDiv.textContent = 'Error de conexión';
+            errDiv.style.display = 'block';
+        }
+    });
+
+    document.getElementById('btn-logout')?.addEventListener('click', async () => {
+        try {
+            await fetch('/api/logout', { method: 'POST' });
+            showLogin();
+            document.getElementById('login-password').value = '';
+        } catch(e) {
+            console.error(e);
+        }
+    });
+
     // Tab switching
     document.querySelectorAll('.nav-item').forEach(button => {
         button.addEventListener('click', (e) => {

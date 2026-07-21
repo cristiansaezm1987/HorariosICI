@@ -8,15 +8,36 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- FontAwesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="styles.css?v=8">
+    <link rel="stylesheet" href="styles.css?v=11">
     <!-- HTML2PDF for generating PDFs client-side -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <!-- Chart.js for charts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+    <!-- Login Screen -->
+    <div id="login-screen" class="login-container">
+        <div class="login-box card">
+            <div class="login-logo">
+                <span class="logo-text" style="color: var(--primary-color);">UNIVERSIDAD <span class="logo-highlight">AUTONOMA</span> DE CHILE</span>
+            </div>
+            <h2>Acceso Restringido</h2>
+            <p style="text-align: center; color: var(--text-light); margin-bottom: 20px;">Por favor, ingresa la contraseña para acceder a la plataforma.</p>
+            <form id="login-form">
+                <div class="filter-group">
+                    <label for="login-password">Contraseña</label>
+                    <input type="password" id="login-password" required placeholder="••••••••" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; box-sizing: border-box; margin-bottom: 15px;">
+                </div>
+                <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-size: 16px;">
+                    <i class="fa-solid fa-right-to-bracket"></i> Entrar
+                </button>
+                <div id="login-error" style="color: #e11d48; text-align: center; margin-top: 10px; font-size: 14px; display: none;"></div>
+            </form>
+        </div>
+    </div>
+
     <!-- Top Corporate Header -->
-    <header class="main-header">
+    <header class="main-header" id="main-header" style="display: none;">
         <div class="header-logo">
             <span class="logo-text">UNIVERSIDAD <span class="logo-highlight">AUTONOMA</span> DE CHILE</span>
             <span class="logo-subtext">SISTEMA DE PLANIFICACIÓN Y DISTRIBUCIÓN</span>
@@ -27,7 +48,7 @@
     </header>
 
     <!-- App Container -->
-    <div class="app-container">
+    <div class="app-container" id="app-container" style="display: none;">
         
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
@@ -88,6 +109,12 @@
                 
                 <button class="btn-secondary" id="btn-clear-filters">
                     <i class="fa-solid fa-filter-circle-xmark"></i> Limpiar Filtros
+                </button>
+            </div>
+            
+            <div style="margin-top: auto; padding: 20px;">
+                <button id="btn-logout" class="btn-secondary" style="width: 100%; border-color: #e11d48; color: #e11d48;">
+                    <i class="fa-solid fa-right-from-bracket"></i> Cerrar Sesión
                 </button>
             </div>
         </aside>
@@ -564,6 +591,6 @@
     <!-- Notification Toast -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="script.js?v=10"></script>
+    <script src="script.js?v=11"></script>
 </body>
 </html>
