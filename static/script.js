@@ -2306,7 +2306,7 @@ https://admuautonoma365-my.sharepoint.com/:w:/g/personal/cristian_saez_uautonoma
             const pathParts = doc.path.replace(/\\/g, '/').split('/');
             const encodedPath = pathParts.map(p => encodeURIComponent(p)).join('/');
             
-            const url = `/documentos/${encodedPath}`;
+            const url = `/documentos/${encodedPath}?t=${Date.now()}`;
             const res = await fetch(url);
             if (!res.ok) throw new Error(`Failed to fetch ${doc.filename}`);
             const blob = await res.blob();
@@ -2424,7 +2424,7 @@ https://admuautonoma365-my.sharepoint.com/:w:/g/personal/cristian_saez_uautonoma
                 }
                 const pathParts = doc.path.replace(/\\/g, '/').split('/');
                 const encodedPath = pathParts.map(p => encodeURIComponent(p)).join('/');
-                const url = `/documentos/${encodedPath}`;
+                const url = `/documentos/${encodedPath}?t=${Date.now()}`;
                 const res = await fetch(url);
                 if (!res.ok) throw new Error(`Failed to fetch ${doc.filename}`);
                 const blob = await res.blob();
