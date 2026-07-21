@@ -2315,13 +2315,31 @@ async function sendDocumentosEmail() {
         
         const files = await Promise.all(filePromises);
         
-        if (navigator.canShare && navigator.canShare({ files: files })) {
+        const shareableFiles = files.filter(f => !f.name.toLowerCase().endsWith('.docx') && !f.name.toLowerCase().endsWith('.doc'));
+        const downloadFiles = files.filter(f => f.name.toLowerCase().endsWith('.docx') || f.name.toLowerCase().endsWith('.doc'));
+        
+        for (const file of downloadFiles) {
+            const url = URL.createObjectURL(file);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = file.name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        if (downloadFiles.length > 0) {
+            showToast('Los archivos Word se descargaron automáticamente por restricciones del navegador. Deberás adjuntarlos manualmente al correo.', 'warning');
+        }
+        
+        if (shareableFiles.length > 0 && navigator.canShare && navigator.canShare({ files: shareableFiles })) {
             await navigator.share({
                 title: 'Documentos Institucionales',
-                files: files
+                files: shareableFiles
             });
-        } else {
-            showToast('Tu navegador no soporta adjuntar múltiples archivos automáticamente (prueba en móvil o Safari/Edge modernos).', 'error');
+        } else if (shareableFiles.length > 0) {
+            showToast('Tu navegador no soporta compartir los PDFs automáticamente.', 'error');
         }
     } catch(err) {
         console.error(err);
@@ -2423,13 +2441,31 @@ Un cordial saludo y que sea un exitoso semestre Primavera 2026.`;
         
         statusToast.remove();
         
-        if (navigator.canShare && navigator.canShare({ files: allFiles })) {
+        const shareableFiles = allFiles.filter(f => !f.name.toLowerCase().endsWith('.docx') && !f.name.toLowerCase().endsWith('.doc'));
+        const downloadFiles = allFiles.filter(f => f.name.toLowerCase().endsWith('.docx') || f.name.toLowerCase().endsWith('.doc'));
+        
+        for (const file of downloadFiles) {
+            const url = URL.createObjectURL(file);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = file.name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        if (downloadFiles.length > 0) {
+            showToast('Los archivos Word se descargaron automáticamente por restricciones del navegador. Deberás adjuntarlos manualmente al correo.', 'warning');
+        }
+        
+        if (shareableFiles.length > 0 && navigator.canShare && navigator.canShare({ files: shareableFiles })) {
             await navigator.share({
                 title: `Consolidado Docente - ${docente.DOCENTE}`,
-                files: allFiles
+                files: shareableFiles
             });
-        } else {
-            showToast('Tu navegador no soporta adjuntar múltiples archivos automáticamente. Descarga los archivos individualmente.', 'error');
+        } else if (shareableFiles.length > 0) {
+            showToast('Tu navegador no soporta compartir los PDFs automáticamente.', 'error');
         }
     } catch(err) {
         console.error(err);
