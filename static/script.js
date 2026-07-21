@@ -1562,9 +1562,22 @@ async function exportAllNivelesPDF() {
     
     showToast(`Generando PDF para ${options.length} niveles... por favor espere.`, 'success');
     
-    for (const nivel of options) {
+    for (const nivelVal of options) {
         const url = new URL('/api/schedule', window.location.origin);
-        url.searchParams.append('nivel', nivel);
+        
+        let n = nivelVal;
+        let s = '';
+        let displayTitle = `Nivel ${nivelVal} (Todos los Grupos)`;
+        
+        if (nivelVal.includes('|')) {
+            [n, s] = nivelVal.split('|');
+            url.searchParams.append('nivel', n);
+            url.searchParams.append('seccion', s);
+            displayTitle = `Nivel ${n} - Grupo ${s}`;
+        } else {
+            url.searchParams.append('nivel', n);
+        }
+        
         if (globalFilters.carrera) url.searchParams.append('carrera', globalFilters.carrera);
         if (globalFilters.jornada) url.searchParams.append('jornada', globalFilters.jornada);
         
@@ -1579,14 +1592,14 @@ async function exportAllNivelesPDF() {
                 
                 // Add header title for this level
                 const header = document.createElement('h3');
-                header.innerHTML = `<i class="fa-solid fa-layer-group"></i> Horario Nivel ${nivel}`;
+                header.innerHTML = `<i class="fa-solid fa-layer-group"></i> Horario ${displayTitle}`;
                 header.style.color = '#0f2b5c';
                 header.style.marginBottom = '15px';
                 pageDiv.appendChild(header);
                 
                 // Create a div to act as the timetable container
                 const ttDiv = document.createElement('div');
-                const ttId = `print-timetable-nivel-${nivel.replace(/\s+/g, '-')}`;
+                const ttId = `print-timetable-nivel-${nivelVal.replace(/[|\s]+/g, '-')}`;
                 ttDiv.id = ttId;
                 pageDiv.appendChild(ttDiv);
                 
