@@ -2236,7 +2236,7 @@ function renderDocumentosGrid(documentos) {
             <div style="flex-grow: 1; min-width: 0;">
                 <div style="font-weight: 500; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${doc.filename}">${doc.filename}</div>
             </div>
-            <a href="/documentos/${doc.path.replace(/\\\\/g, '/')}" download="${doc.filename}" class="btn-pdf" style="background: var(--secondary-color); padding: 6px 12px; font-size: 0.8rem; text-decoration: none;"><i class="fa-solid fa-download"></i> Descargar</a>
+            <a href="/static/documentos/${doc.path.replace(/\\\\/g, '/')}" download="${doc.filename}" class="btn-pdf" style="background: var(--secondary-color); padding: 6px 12px; font-size: 0.8rem; text-decoration: none;"><i class="fa-solid fa-download"></i> Descargar</a>
         `;
         grid.appendChild(card);
     });
@@ -2273,7 +2273,7 @@ function renderDocenteDocumentos() {
                 <i class="fa-solid fa-file-contract" style="color: var(--secondary-color); font-size: 1.2rem;"></i>
                 <span style="font-weight: 500; font-size: 0.9rem;">${doc.filename}</span>
             </div>
-            <a href="/documentos/${doc.path.replace(/\\/g, '/')}" download="${doc.filename}" class="btn-pdf" style="background: var(--secondary-color); font-size: 0.8rem; padding: 4px 10px;"><i class="fa-solid fa-download"></i></a>
+            <a href="/static/documentos/${doc.path.replace(/\\/g, '/')}" download="${doc.filename}" class="btn-pdf" style="background: var(--secondary-color); font-size: 0.8rem; padding: 4px 10px;"><i class="fa-solid fa-download"></i></a>
         `;
         list.appendChild(item);
     });
@@ -2306,7 +2306,7 @@ https://admuautonoma365-my.sharepoint.com/:w:/g/personal/cristian_saez_uautonoma
             const pathParts = doc.path.replace(/\\/g, '/').split('/');
             const encodedPath = pathParts.map(p => encodeURIComponent(p)).join('/');
             
-            const url = `/documentos/${encodedPath}`;
+            const url = `/static/documentos/${encodedPath}`;
             const res = await fetch(url);
             if (!res.ok) throw new Error(`Failed to fetch ${doc.filename}`);
             const blob = await res.blob();
@@ -2424,7 +2424,7 @@ https://admuautonoma365-my.sharepoint.com/:w:/g/personal/cristian_saez_uautonoma
                 }
                 const pathParts = doc.path.replace(/\\/g, '/').split('/');
                 const encodedPath = pathParts.map(p => encodeURIComponent(p)).join('/');
-                const url = `/documentos/${encodedPath}`;
+                const url = `/static/documentos/${encodedPath}`;
                 const res = await fetch(url);
                 if (!res.ok) throw new Error(`Failed to fetch ${doc.filename}`);
                 const blob = await res.blob();
