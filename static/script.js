@@ -2006,8 +2006,7 @@ async function sendScheduleEmail() {
                 
                 await navigator.share({
                     files: filesToShare,
-                    title: `Horario ${docenteName}`,
-                    text: `Estimado/a ${docenteName},\n\nAdjunto encontrará su horario académico semanal.`
+                    title: `Horario ${docenteName}`
                 });
                 return;
             } catch (shareError) {
@@ -2092,8 +2091,7 @@ async function sendProgramasEmail() {
         try {
             await navigator.share({
                 files: filesToShare,
-                title: `Programas de Asignaturas - ${docenteName}`,
-                text: `Estimado/a ${docenteName},\n\nAdjunto encontrará los programas de las asignaturas correspondientes.`
+                title: `Programas de Asignaturas - ${docenteName}`
             });
             return;
         } catch (shareError) {
@@ -2327,7 +2325,6 @@ async function sendDocumentosEmail() {
         if (navigator.canShare && navigator.canShare({ files: files })) {
             await navigator.share({
                 title: 'Documentos Institucionales',
-                text: 'Adjunto envío documentos institucionales.',
                 files: files
             });
         } else {
@@ -2419,7 +2416,6 @@ async function sendTodoEmail(docente) {
         if (navigator.canShare && navigator.canShare({ files: allFiles })) {
             await navigator.share({
                 title: `Consolidado Docente - ${docente.DOCENTE}`,
-                text: `Estimado/a ${docente.DOCENTE}, adjunto encontrará su horario académico, programas de asignatura, reglamentación institucional y calendario académico.`,
                 files: allFiles
             });
         } else {
