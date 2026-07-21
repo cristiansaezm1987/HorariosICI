@@ -1891,6 +1891,45 @@ async function exportAllNivelesPDF() {
     }, 1500);
 }
 
+// Global dictionary of teacher emails
+const emailsDocentes = {
+    "ABRAHAM REYNALDO BOBADILLA OSSES": "abraham.bobadilla@cloud.uautonoma.cl",
+    "ANGELICA MARIA VILORIA ADRIANZA": "angelica.viloria@cloud.uautonoma.cl",
+    "ANIBAL FERNANDO FERNANDOY ABARCA": "anibal.fernandoy@cloud.uautonoma.cl",
+    "AXEL MAURICIO OVALLE MUÑOZ": "AXEL.OVALLE@CLOUD.UAUTONOMA.CL",
+    "CAMILO ALEJANDRO FUENTES BEALS": "camilo.fuentes5@cloud.uautonoma.cl",
+    "CARLOS RAMIREZ CARRASCO": "carlos.ramirez5@uautonoma.cl",
+    "CRISTIAN ALBERTO SÁEZ MORALES": "cristian.saez@uautonoma.cl",
+    "CRISTOFHER ROJAS ROJAS": "cristofher.rojas@cloud.uautonoma.cl",
+    "DAVID NUÑEZ MALDONADO": "david.nunez@uautonoma.cl",
+    "EMILIO SAURINA LLABRES": "emilio.saurina@cloud.uautonoma.cl",
+    "ENRIQUE FERNANDO VERGARA CUBILLOS": "enrique.vergara@cloud.uautonoma.cl",
+    "FERNANDO JAVIER MORALES ARRIAGADA": "fernando.morales4@cloud.uautonoma.cl",
+    "GIORDANO AARON CASTRO VILLARROEL": "GIORDANO.CASTRO@CLOUD.UAUTONOMA.CL",
+    "GONZALO NICOLAS CARREÑO BAHAMONDEZ": "gonzalo.carreno@cloud.uautonoma.cl",
+    "GUSTAVO RUBIO GONZALEZ": "gustavo.rubio@cloud.uautonoma.cl",
+    "HÉCTOR ANDRÉS ORELLANA ROJAS": "HECTOR.ORELLANA@CLOUD.UAUTONOMA.CL",
+    "JOHAN MANUEL ORTIGOZA RUIZ": "JOHAN.ORTIGOZA@CLOUD.UAUTONOMA.CL",
+    "JOHANNA ALVARADO NEIRA": "johanna.alvarado@uautonoma.cl",
+    "JOHN ALFONSO KANDALAFT LETELIER": "john.kandalaft@cloud.uautonoma.cl",
+    "JUAN VERGAÑO SALAZAR": "juan.vergano@uautonoma.cl",
+    "LUIS ALBERTO MORALES QUINTANA": "luis.morales@cloud.uautonoma.cl",
+    "MARCELO EDUARDO HERNÁNDEZ CARO": "marcelo.hernandez4@cloud.uautonoma.cl",
+    "MARCELO SAN MARTIN LANCTOT": "marcelo.sanmartin@cloud.uautonoma.cl",
+    "MARCOS RODRIGO CONTRERAS FUENTES": "marcos.contreras@cloud.uautonoma.cl",
+    "MARISOL DE LAS MERCEDES PIZARRO LEÓN": "MARISOL.PIZARRO@CLOUD.UAUTONOMA.CL",
+    "NICOLAS GONZALEZ MEDEL": "nicolas.gonzalez@uautonoma.cl",
+    "NICOLÁS ARIEL MEDINA PEÑA": "nicolas.medina5@cloud.uautonoma.cl",
+    "OSCAR IVAN CANDIA AVELLO": "oscar.candia@uautonoma.cl",
+    "PATRICIA ANDREA MOLLER ACUÑA": "PATRICIA.MOLLER@CLOUD.UAUTONOMA.CL",
+    "ROBINSON PATRICIO GÓMEZ NÚÑEZ": "robinson.gomez@cloud.uautonoma.cl",
+    "RODRIGO URZUA LEIVA": "rodrigo.urzua2@cloud.uautonoma.cl",
+    "SOFIA DANIELA TOSSO ALVAREZ": "SOFIA.TOSSO@CLOUD.UAUTONOMA.CL",
+    "TORIBIO ANDRÉS FIGUEROA AGUILAR": "toribio.figueroa@cloud.uautonoma.cl",
+    "WALDO MIGUEL ANGEL SILVA RODRIGUEZ": "WALDO.SILVA@CLOUD.UAUTONOMA.CL",
+    "YOSLAINE RUIZ OTAÑO": "yoslaine.ruiz@cloud.uautonoma.cl"
+};
+
 // --- EMAIL DOCENTE LOGIC ---
 async function sendScheduleEmail() {
     const docenteName = document.getElementById('docente-name').textContent;
@@ -1899,44 +1938,6 @@ async function sendScheduleEmail() {
         return;
     }
     
-    const emailsDocentes = {
-        "ABRAHAM REYNALDO BOBADILLA OSSES": "abraham.bobadilla@cloud.uautonoma.cl",
-        "ANGELICA MARIA VILORIA ADRIANZA": "angelica.viloria@cloud.uautonoma.cl",
-        "ANIBAL FERNANDO FERNANDOY ABARCA": "anibal.fernandoy@cloud.uautonoma.cl",
-        "AXEL MAURICIO OVALLE MUÑOZ": "AXEL.OVALLE@CLOUD.UAUTONOMA.CL",
-        "CAMILO ALEJANDRO FUENTES BEALS": "camilo.fuentes5@cloud.uautonoma.cl",
-        "CARLOS RAMIREZ CARRASCO": "carlos.ramirez5@uautonoma.cl",
-        "CRISTIAN ALBERTO SÁEZ MORALES": "cristian.saez@uautonoma.cl",
-        "CRISTOFHER ROJAS ROJAS": "cristofher.rojas@cloud.uautonoma.cl",
-        "DAVID NUÑEZ MALDONADO": "david.nunez@uautonoma.cl",
-        "EMILIO SAURINA LLABRES": "emilio.saurina@cloud.uautonoma.cl",
-        "ENRIQUE FERNANDO VERGARA CUBILLOS": "enrique.vergara@cloud.uautonoma.cl",
-        "FERNANDO JAVIER MORALES ARRIAGADA": "fernando.morales4@cloud.uautonoma.cl",
-        "GIORDANO AARON CASTRO VILLARROEL": "GIORDANO.CASTRO@CLOUD.UAUTONOMA.CL",
-        "GONZALO NICOLAS CARREÑO BAHAMONDEZ": "gonzalo.carreno@cloud.uautonoma.cl",
-        "GUSTAVO RUBIO GONZALEZ": "gustavo.rubio@cloud.uautonoma.cl",
-        "HÉCTOR ANDRÉS ORELLANA ROJAS": "HECTOR.ORELLANA@CLOUD.UAUTONOMA.CL",
-        "JOHAN MANUEL ORTIGOZA RUIZ": "JOHAN.ORTIGOZA@CLOUD.UAUTONOMA.CL",
-        "JOHANNA ALVARADO NEIRA": "johanna.alvarado@uautonoma.cl",
-        "JOHN ALFONSO KANDALAFT LETELIER": "john.kandalaft@cloud.uautonoma.cl",
-        "JUAN VERGAÑO SALAZAR": "juan.vergano@uautonoma.cl",
-        "LUIS ALBERTO MORALES QUINTANA": "luis.morales@cloud.uautonoma.cl",
-        "MARCELO EDUARDO HERNÁNDEZ CARO": "marcelo.hernandez4@cloud.uautonoma.cl",
-        "MARCELO SAN MARTIN LANCTOT": "marcelo.sanmartin@cloud.uautonoma.cl",
-        "MARCOS RODRIGO CONTRERAS FUENTES": "marcos.contreras@cloud.uautonoma.cl",
-        "MARISOL DE LAS MERCEDES PIZARRO LEÓN": "MARISOL.PIZARRO@CLOUD.UAUTONOMA.CL",
-        "NICOLAS GONZALEZ MEDEL": "nicolas.gonzalez@uautonoma.cl",
-        "NICOLÁS ARIEL MEDINA PEÑA": "nicolas.medina5@cloud.uautonoma.cl",
-        "OSCAR IVAN CANDIA AVELLO": "oscar.candia@uautonoma.cl",
-        "PATRICIA ANDREA MOLLER ACUÑA": "PATRICIA.MOLLER@CLOUD.UAUTONOMA.CL",
-        "ROBINSON PATRICIO GÓMEZ NÚÑEZ": "robinson.gomez@cloud.uautonoma.cl",
-        "RODRIGO URZUA LEIVA": "rodrigo.urzua2@cloud.uautonoma.cl",
-        "SOFIA DANIELA TOSSO ALVAREZ": "SOFIA.TOSSO@CLOUD.UAUTONOMA.CL",
-        "TORIBIO ANDRÉS FIGUEROA AGUILAR": "toribio.figueroa@cloud.uautonoma.cl",
-        "WALDO MIGUEL ANGEL SILVA RODRIGUEZ": "WALDO.SILVA@CLOUD.UAUTONOMA.CL",
-        "YOSLAINE RUIZ OTAÑO": "yoslaine.ruiz@cloud.uautonoma.cl"
-    };
-
     let email = emailsDocentes[docenteName.trim()] || '';
     
     // Guess email based on name if not found in dictionary
@@ -2325,7 +2326,14 @@ document.getElementById('btn-enviar-todo')?.addEventListener('click', async () =
 });
 
 async function sendTodoEmail(docente) {
-    const email = prompt('Ingrese el correo del docente para enviar todo consolidado:');
+    let defaultEmail = emailsDocentes[docente.DOCENTE.trim()] || '';
+    if (!defaultEmail) {
+        const parts = docente.DOCENTE.toLowerCase().split(' ').filter(p => p.trim() !== '');
+        if (parts.length >= 2) {
+            defaultEmail = `${parts[0]}.${parts[1]}@uautonoma.cl`;
+        }
+    }
+    const email = prompt('Ingrese el correo del docente para enviar todo consolidado:', defaultEmail);
     if (email === null) return;
     
     const statusToast = document.createElement('div');
