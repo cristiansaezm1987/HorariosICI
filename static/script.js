@@ -1961,8 +1961,8 @@ async function sendScheduleEmail() {
         margin:       10,
         filename:     `Horario_${docenteName.replace(/ /g, '_')}.pdf`,
         image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, windowWidth: 1000 },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        html2canvas:  { scale: 2, useCORS: true },
+        jsPDF:        { unit: 'mm', format: 'a3', orientation: 'landscape' },
         pagebreak:    { mode: 'avoid-all' }
     };
     // Copiar el correo al portapapeles de inmediato para evitar problemas de contexto asíncrono
@@ -2356,8 +2356,8 @@ async function sendTodoEmail(docente) {
             margin:       10,
             filename:     `Horario_${docente.DOCENTE.replace(/ /g, '_')}.pdf`,
             image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, useCORS: true, windowWidth: 1000 },
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            html2canvas:  { scale: 2, useCORS: true },
+            jsPDF:        { unit: 'mm', format: 'a3', orientation: 'landscape' },
             pagebreak:    { mode: 'avoid-all' }
         };
         const pdfWorker = await html2pdf().set(opt).from(element).output('blob');
