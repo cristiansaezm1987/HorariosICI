@@ -2300,6 +2300,9 @@ https://admuautonoma365-my.sharepoint.com/:w:/g/personal/cristian_saez_uautonoma
         const shareableFiles = [];
         
         const filePromises = documentosInstitucionales.map(async doc => {
+            if (doc.filename.toLowerCase().endsWith('.docx') || doc.filename.toLowerCase().endsWith('.doc')) {
+                return null;
+            }
             const pathParts = doc.path.replace(/\\/g, '/').split('/');
             const encodedPath = pathParts.map(p => encodeURIComponent(p)).join('/');
             
@@ -2416,6 +2419,9 @@ https://admuautonoma365-my.sharepoint.com/:w:/g/personal/cristian_saez_uautonoma
         // 3. Documentos
         if (documentosInstitucionales && documentosInstitucionales.length > 0) {
             const docPromises = documentosInstitucionales.map(async doc => {
+                if (doc.filename.toLowerCase().endsWith('.docx') || doc.filename.toLowerCase().endsWith('.doc')) {
+                    return null;
+                }
                 const pathParts = doc.path.replace(/\\/g, '/').split('/');
                 const encodedPath = pathParts.map(p => encodeURIComponent(p)).join('/');
                 const url = `/documentos/${encodedPath}`;
