@@ -2291,47 +2291,40 @@ document.getElementById('btn-email-documentos')?.addEventListener('click', async
 });
 
 async function sendDocumentosEmail() {
-    const saludo = `Adjunto envío reglamentación institucional y documentos de interés.`;
     try {
-        await copyToClipboard(saludo);
-        showToast('Mensaje copiado al portapapeles. Pega con Ctrl+V en el cuerpo del correo.', 'info');
-    } catch (err) {}
-    try {
+        let saludo = `Adjunto envío reglamentación institucional y documentos de interés.`;
+        const shareableFiles = [];
+        const docLinks = [];
+        
         const filePromises = documentosInstitucionales.map(async doc => {
+            const isDocx = doc.filename.toLowerCase().endsWith('.docx') || doc.filename.toLowerCase().endsWith('.doc');
             const pathParts = doc.path.replace(/\\/g, '/').split('/');
             const encodedPath = pathParts.map(p => encodeURIComponent(p)).join('/');
+            
+            if (isDocx) {
+                const link = `${window.location.origin}/documentos/${encodedPath}`;
+                docLinks.push(`- ${doc.filename}: ${link}`);
+                return null;
+            }
+            
             const url = `/documentos/${encodedPath}`;
             const res = await fetch(url);
             if (!res.ok) throw new Error(`Failed to fetch ${doc.filename}`);
             const blob = await res.blob();
-            let mimeType = 'application/pdf';
-            if (doc.filename.toLowerCase().endsWith('.docx')) {
-                mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-            } else if (doc.filename.toLowerCase().endsWith('.doc')) {
-                mimeType = 'application/msword';
-            }
-            return new File([blob], doc.filename, { type: mimeType });
+            return new File([blob], doc.filename, { type: 'application/pdf' });
         });
         
         const files = await Promise.all(filePromises);
+        shareableFiles.push(...files.filter(f => f !== null));
         
-        const shareableFiles = files.filter(f => !f.name.toLowerCase().endsWith('.docx') && !f.name.toLowerCase().endsWith('.doc'));
-        const downloadFiles = files.filter(f => f.name.toLowerCase().endsWith('.docx') || f.name.toLowerCase().endsWith('.doc'));
-        
-        for (const file of downloadFiles) {
-            const url = URL.createObjectURL(file);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = file.name;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+        if (docLinks.length > 0) {
+            saludo += `\n\nAdicionalmente, puede descargar los siguientes documentos desde estos enlaces (el correo bloquea adjuntarlos automáticamente):\n${docLinks.join('\n')}`;
         }
         
-        if (downloadFiles.length > 0) {
-            showToast('Los archivos Word se descargaron automáticamente por restricciones del navegador. Deberás adjuntarlos manualmente al correo.', 'warning');
-        }
+        try {
+            await copyToClipboard(saludo);
+            showToast('Mensaje copiado al portapapeles. Pega con Ctrl+V en el cuerpo del correo.', 'info');
+        } catch (err) {}
         
         if (shareableFiles.length > 0 && navigator.canShare && navigator.canShare({ files: shareableFiles })) {
             await navigator.share({
@@ -2366,7 +2359,7 @@ async function sendTodoEmail(docente) {
     statusToast.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Preparando todos los archivos (Horario, Programas, Documentos)...';
     document.getElementById('toast-container').appendChild(statusToast);
     
-    const saludo = `Estimado/a ${docente.DOCENTE},
+    let saludo = `Estimado/a ${docente.DOCENTE},
     
 Junto con saludar, adjunto encontrará su horario académico, programas de asignatura, reglamento general del estudiante y calendario académico. 
 El syllabus lo deberá enviar antes del 31 de julio del presente, también recordar que es obligación presentar a sus alumnos durante las primeras clases.
@@ -2377,6 +2370,23 @@ Este examen se realizará en las fechas definidas en el calendario académico. S
 Sus cursos deberán estar cargados en CANVAS durante la semana. 
 Se realizó revisión de salas, sin embargo, esto podría sufrir modificaciones con el paso de los días.  
 Un cordial saludo y que sea un exitoso semestre Primavera 2026.`;
+
+    const docLinks = [];
+    if (documentosInstitucionales && documentosInstitucionales.length > 0) {
+        for (const doc of documentosInstitucionales) {
+            if (doc.filename.toLowerCase().endsWith('.docx') || doc.filename.toLowerCase().endsWith('.doc')) {
+                const pathParts = doc.path.replace(/\\/g, '/').split('/');
+                const encodedPath = pathParts.map(p => encodeURIComponent(p)).join('/');
+                const link = `${window.location.origin}/documentos/${encodedPath}`;
+                docLinks.push(`- ${doc.filename}:\n  ${link}`);
+            }
+        }
+    }
+    
+    if (docLinks.length > 0) {
+        saludo += `\n\nAdicionalmente, puede descargar los siguientes documentos desde estos enlaces (el correo bloquea adjuntarlos automáticamente):\n${docLinks.join('\n')}`;
+    }
+
     try {
         await copyToClipboard(saludo);
         showToast('Mensaje copiado al portapapeles. Pega con Ctrl+V en el cuerpo del correo.', 'info');
@@ -2421,43 +2431,24 @@ Un cordial saludo y que sea un exitoso semestre Primavera 2026.`;
         // 3. Documentos
         if (documentosInstitucionales && documentosInstitucionales.length > 0) {
             const docPromises = documentosInstitucionales.map(async doc => {
+                if (doc.filename.toLowerCase().endsWith('.docx') || doc.filename.toLowerCase().endsWith('.doc')) {
+                    return null;
+                }
                 const pathParts = doc.path.replace(/\\/g, '/').split('/');
                 const encodedPath = pathParts.map(p => encodeURIComponent(p)).join('/');
                 const url = `/documentos/${encodedPath}`;
                 const res = await fetch(url);
                 if (!res.ok) throw new Error(`Failed to fetch ${doc.filename}`);
                 const blob = await res.blob();
-                let mimeType = 'application/pdf';
-                if (doc.filename.toLowerCase().endsWith('.docx')) {
-                    mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-                } else if (doc.filename.toLowerCase().endsWith('.doc')) {
-                    mimeType = 'application/msword';
-                }
-                return new File([blob], doc.filename, { type: mimeType });
+                return new File([blob], doc.filename, { type: 'application/pdf' });
             });
             const docFiles = await Promise.all(docPromises);
-            allFiles.push(...docFiles);
+            allFiles.push(...docFiles.filter(f => f !== null));
         }
         
         statusToast.remove();
         
-        const shareableFiles = allFiles.filter(f => !f.name.toLowerCase().endsWith('.docx') && !f.name.toLowerCase().endsWith('.doc'));
-        const downloadFiles = allFiles.filter(f => f.name.toLowerCase().endsWith('.docx') || f.name.toLowerCase().endsWith('.doc'));
-        
-        for (const file of downloadFiles) {
-            const url = URL.createObjectURL(file);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = file.name;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-        
-        if (downloadFiles.length > 0) {
-            showToast('Los archivos Word se descargaron automáticamente por restricciones del navegador. Deberás adjuntarlos manualmente al correo.', 'warning');
-        }
+        const shareableFiles = allFiles;
         
         if (shareableFiles.length > 0 && navigator.canShare && navigator.canShare({ files: shareableFiles })) {
             await navigator.share({
