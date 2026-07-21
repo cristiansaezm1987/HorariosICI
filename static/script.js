@@ -2340,7 +2340,19 @@ async function sendTodoEmail(docente) {
     statusToast.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Preparando todos los archivos (Horario, Programas, Documentos)...';
     document.getElementById('toast-container').appendChild(statusToast);
     
-    const saludo = `Estimado/a ${docente.DOCENTE},\n\nAdjunto encontrará su horario académico, programas de asignatura, reglamentación institucional y calendario académico.`;
+    const saludo = `Estimado/a ${docente.DOCENTE},
+    
+Junto con saludar, adjunto encontrará su horario académico, programas de asignatura, reglamento general del estudiante y calendario académico. 
+El syllabus lo deberá enviar antes del 31 de julio del presente, tambien recordar que es obligación presentar a sus alumnos durante las primeras clases.
+Importante reiterar, que durante el semestre se aplicará el reglamento general del estudiante en su totalidad, por lo que ya no va la prueba sustitutiva, sino examen según Artículo 27:
+ 
+Artículo 27. La nota final mínima para la aprobación de las asignaturas será cuatro coma cero (4,0), pudiendo el syllabus establecer una nota superior de aprobación. Los estudiantes que, promediando sus calificaciones, obtengan una nota inferior a 4,0 en asignaturas teóricas, podrán rendir un examen de repetición, siempre que su promedio final en la asignatura sea igual o superior a 3,5 y cumplan con la asistencia exigida por el presente Reglamento.
+Este examen se realizará en las fechas definidas en el calendario académico. Si el estudiante obtiene en examen de repetición una nota igual o superior a 4,0, la nota final de la asignatura será 4,0. En caso contrario, mantendrá la nota obtenida durante el período académico.
+
+Sus cursos deberán esta cargados en CANVAS durante la semana. 
+Se realizó revisión de salas, sin embargo esto podría sufrir modificaciones con el paso de los días.  
+
+Un cordial saludo y que sea un exitoso semestre Primavera 2026.`;
     try {
         await copyToClipboard(saludo);
         showToast('Mensaje copiado al portapapeles. Pega con Ctrl+V en el cuerpo del correo.', 'info');
