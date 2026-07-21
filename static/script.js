@@ -2419,7 +2419,7 @@ async function sendTodoEmail(docente) {
         if (navigator.canShare && navigator.canShare({ files: allFiles })) {
             await navigator.share({
                 title: `Consolidado Docente - ${docente.DOCENTE}`,
-                text: `Estimado/a ${docente.DOCENTE}, adjunto encontrará su horario académico, programas de asignatura y reglamentación institucional.`,
+                text: `Estimado/a ${docente.DOCENTE}, adjunto encontrará su horario académico, programas de asignatura, reglamentación institucional y calendario académico.`,
                 files: allFiles
             });
         } else {
