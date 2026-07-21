@@ -1179,6 +1179,7 @@ function selectDocente(docente) {
     document.getElementById('docente-cargo').textContent = docente.CARGO || 'Docente';
     document.getElementById('docente-grado').textContent = docente.GRADO || 'N/A';
     document.getElementById('docente-id').textContent = docente.ID_DOCENTE || '-';
+    document.getElementById('docente-correo-text').textContent = getDocenteEmail(docente.DOCENTE) || 'Sin correo registrado';
     document.getElementById('docente-contrato').textContent = docente.TIPO_CONTRATO || '-';
     document.getElementById('docente-jerarquia').textContent = docente.JERARQUIA || '-';
     document.getElementById('docente-sede').textContent = docente.SEDE_DOCENTE || '-';
@@ -1943,6 +1944,18 @@ const emailsDocentes = {
     "YOSLAINE RUIZ OTAÑO": "yoslaine.ruiz@cloud.uautonoma.cl"
 };
 
+function getDocenteEmail(docenteName) {
+    if (!docenteName) return '';
+    let email = emailsDocentes[docenteName.trim()] || '';
+    if (!email) {
+        const parts = docenteName.toLowerCase().split(' ').filter(p => p.trim() !== '');
+        if (parts.length >= 2) {
+            email = `${parts[0]}.${parts[1]}@uautonoma.cl`;
+        }
+    }
+    return email;
+}
+
 // --- EMAIL DOCENTE LOGIC ---
 async function sendScheduleEmail() {
     const docenteName = document.getElementById('docente-name').textContent;
@@ -1951,15 +1964,7 @@ async function sendScheduleEmail() {
         return;
     }
     
-    let email = emailsDocentes[docenteName.trim()] || '';
-    
-    // Guess email based on name if not found in dictionary
-    if (!email) {
-        const parts = docenteName.toLowerCase().split(' ').filter(p => p.trim() !== '');
-        if (parts.length >= 2) {
-            email = `${parts[0]}.${parts[1]}@uautonoma.cl`;
-        }
-    }
+    let email = getDocenteEmail(docenteName);
     
     if (typeof html2pdf === 'undefined') {
         showToast('Error: Librería de PDF no cargada aún', 'error');
@@ -1983,14 +1988,14 @@ async function sendScheduleEmail() {
         html2canvas:  { scale: 2, useCORS: true },
         jsPDF:        { unit: 'mm', format: [pdfWidth, pdfHeight], orientation: 'portrait' }
     };
-    // Copiar el correo al portapapeles de inmediato para evitar problemas de contexto asíncrono
-    if (email) {
-        try {
-            await copyToClipboard(email);
-            showToast(`Correo copiado al portapapeles: ${email}. Presiona Ctrl+V en tu correo.`, 'info');
-        } catch (clipErr) {
-            console.log('Clipboard falló:', clipErr);
-        }
+    
+    const saludo = `Estimado/a ${docenteName},\n\nAdjunto encontrará su horario académico semanal.`;
+    
+    try {
+        await copyToClipboard(saludo);
+        showToast(`Mensaje copiado al portapapeles. Pega con Ctrl+V en el cuerpo del correo.`, 'info');
+    } catch (clipErr) {
+        console.log('Clipboard falló:', clipErr);
     }
     
     try {
@@ -2043,24 +2048,12 @@ async function sendProgramasEmail() {
     }
     
     const docenteName = selectedDocente.DOCENTE;
-    let email = selectedDocente.CORREO;
-    
-    // Guess email based on name if not found in dictionary
-    if (!email) {
-        const parts = docenteName.toLowerCase().split(' ').filter(p => p.trim() !== '');
-        if (parts.length >= 2) {
-            email = `${parts[0]}.${parts[1]}@uautonoma.cl`;
-        }
-    }
-    
-    // Copiar el correo al portapapeles de inmediato para evitar problemas de contexto asíncrono
-    if (email) {
-        try {
-            await copyToClipboard(email);
-            showToast(`Correo copiado al portapapeles: ${email}. Presiona Ctrl+V en tu correo.`, 'info');
-        } catch (clipErr) {
-            console.log('Clipboard falló:', clipErr);
-        }
+    const saludo = `Estimado/a ${docenteName},\n\nAdjunto encontrará los programas de las asignaturas correspondientes.`;
+    try {
+        await copyToClipboard(saludo);
+        showToast(`Mensaje copiado al portapapeles. Pega con Ctrl+V en el cuerpo del correo.`, 'info');
+    } catch (clipErr) {
+        console.log('Clipboard falló:', clipErr);
     }
     
     showToast('Preparando programas para envío...', 'info');
@@ -2298,19 +2291,11 @@ document.getElementById('btn-email-documentos')?.addEventListener('click', async
 });
 
 async function sendDocumentosEmail() {
-    const email = prompt('Ingrese el correo al que desea enviar los documentos institucionales:');
-    if (email === null) return;
-    
-    if (email) {
-        try {
-            await copyToClipboard(email);
-            showToast('Correo copiado al portapapeles. Pégalo en tu cliente de correo (Ctrl+V).', 'success');
-        } catch (err) {
-            console.error('Failed to copy email: ', err);
-            showToast('No se pudo copiar el correo automáticamente. Por favor, escríbelo manualmente.', 'error');
-        }
-    }
-    
+    const saludo = `Adjunto envío reglamentación institucional y documentos de interés.`;
+    try {
+        await copyToClipboard(saludo);
+        showToast('Mensaje copiado al portapapeles. Pega con Ctrl+V en el cuerpo del correo.', 'info');
+    } catch (err) {}
     try {
         const filePromises = documentosInstitucionales.map(async doc => {
             const url = `/documentos/${doc.path.replace(/\\/g, '/')}`;
@@ -2355,12 +2340,11 @@ async function sendTodoEmail(docente) {
     statusToast.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Preparando todos los archivos (Horario, Programas, Documentos)...';
     document.getElementById('toast-container').appendChild(statusToast);
     
-    if (email) {
-        try {
-            await copyToClipboard(email);
-            showToast('Correo copiado al portapapeles. Pégalo en tu cliente de correo (Ctrl+V).', 'success');
-        } catch (err) {}
-    }
+    const saludo = `Estimado/a ${docente.DOCENTE},\n\nAdjunto encontrará su horario académico, programas de asignatura, reglamentación institucional y calendario académico.`;
+    try {
+        await copyToClipboard(saludo);
+        showToast('Mensaje copiado al portapapeles. Pega con Ctrl+V en el cuerpo del correo.', 'info');
+    } catch (err) {}
     
     try {
         const allFiles = [];
@@ -2434,4 +2418,17 @@ document.getElementById('search-documentos')?.addEventListener('input', (e) => {
     
     const filtered = documentosInstitucionales.filter(doc => doc.filename.toLowerCase().includes(q));
     renderDocumentosGrid(filtered);
+});
+
+// Event listener para copiar el correo desde el perfil
+document.getElementById('btn-copy-correo')?.addEventListener('click', async () => {
+    const email = document.getElementById('docente-correo-text').textContent;
+    if (email && email !== 'Sin correo registrado' && email !== '-') {
+        try {
+            await copyToClipboard(email);
+            showToast(`Correo copiado al portapapeles: ${email}`, 'success');
+        } catch (err) {
+            console.error('Failed to copy', err);
+        }
+    }
 });
