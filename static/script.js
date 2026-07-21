@@ -1244,6 +1244,7 @@ function normalizeText(text) {
     if (n.includes("adm. y direcc")) return "administracion y direccion de proyectos";
     if (n.includes("elect. y electromagnetismo")) return "electricidad y electromagnetismo";
     if (n.includes("medio ambiente")) return n.replace("medio ambiente", "medioambiente");
+    if (n.includes("e commerce & e business")) return "e-commerce e-business";
     
     return n;
 }
