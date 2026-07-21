@@ -1240,6 +1240,7 @@ function normalizeText(text) {
     
     // Manual aliases
     if (n.includes("dcho empresa y ambiental")) return "derecho de empresa y ambiental";
+    if (n.includes("consul de emp")) return "consultoria de empresas";
     
     return n;
 }
