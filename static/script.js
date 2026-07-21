@@ -2036,9 +2036,18 @@ async function loadProgramas() {
         if (response.ok) {
             programasAsignaturas = await response.json();
             renderProgramasGrid(programasAsignaturas);
+        } else {
+            const grid = document.getElementById('programas-grid');
+            if (grid) {
+                grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #e11d48;"><i class="fa-solid fa-triangle-exclamation"></i> Error al cargar programas (Código ${response.status}). Esto puede deberse a que el servidor remoto (Vercel) no tiene acceso a la carpeta local C: de tu computador.</div>`;
+            }
         }
     } catch (error) {
         console.error('Error loading programs:', error);
+        const grid = document.getElementById('programas-grid');
+        if (grid) {
+            grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #e11d48;"><i class="fa-solid fa-triangle-exclamation"></i> Error de conexión: ${error.message}</div>`;
+        }
     }
     
     document.getElementById('search-programas')?.addEventListener('input', (e) => {
