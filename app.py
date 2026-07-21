@@ -21,6 +21,14 @@ def check_auth():
         if not session.get('logged_in'):
             return jsonify({'success': False, 'message': 'No autorizado'}), 401
 
+@app.after_request
+def add_cache_headers(response):
+    if request.path.startswith('/api/'):
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    return response
+
 @app.route('/api/check-auth', methods=['GET'])
 def check_auth_endpoint():
     return jsonify({'logged_in': bool(session.get('logged_in'))})
