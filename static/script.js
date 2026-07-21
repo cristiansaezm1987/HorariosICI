@@ -9,6 +9,7 @@ let globalFilters = {
 let allDocentes = [];
 let allSalas = [];
 let allAsignaturas = []; // raw data for client-side filtering
+let programasAsignaturas = []; // fetched from /api/programas
 let selectedDocente = null;
 let selectedSala = null;
 let selectedNivel = '';
@@ -93,6 +94,7 @@ function checkDatabaseStatus() {
                 
                 // Show filters and load selectors
                 loadGlobalFilters();
+                loadProgramas();
                 
                 // Load current tab
                 switchTab(activeTab);
@@ -490,6 +492,10 @@ function setupEventListeners() {
         document.getElementById('export-niveles-modal').style.display = 'none';
         exportAllNivelesPDF();
     });
+
+    // EMAIL DOCENTE
+    document.getElementById('btn-email-docente')?.addEventListener('click', sendScheduleEmail);
+    document.getElementById('btn-email-programas')?.addEventListener('click', sendProgramasEmail);
 }
 
 // --- FILE UPLOAD LOGIC ---
@@ -1117,9 +1123,75 @@ function selectDocente(docente) {
         .then(data => {
             if (data.success) {
                 renderTimetable('docente-timetable', data.schedule, 'docente');
+                
+                // Match programs
+                matchAndRenderDocenteProgramas(data.schedule);
             }
         })
         .catch(err => console.error('Error loading schedule for docente:', err));
+}
+
+function normalizeText(text) {
+    if (!text) return "";
+    return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\ufffd/g, "").toLowerCase().trim();
+}
+
+function matchAndRenderDocenteProgramas(scheduleData) {
+    const card = document.getElementById('docente-programas-card');
+    const list = document.getElementById('docente-programas-list');
+    if (!card || !list) return;
+    
+    // Extract unique subjects
+    const uniqueSubjects = new Set();
+    if (Array.isArray(scheduleData)) {
+        scheduleData.forEach(row => {
+            if (row.TITULO) uniqueSubjects.add(normalizeText(row.TITULO));
+        });
+    }
+    
+    currentDocenteProgramas = [];
+    
+    uniqueSubjects.forEach(subjectName => {
+        // Find best match in programasAsignaturas
+        // Check if subjectName is a substring of clean_name or vice versa
+        const matched = programasAsignaturas.filter(p => p.clean_name.includes(subjectName) || subjectName.includes(p.clean_name));
+        if (matched.length > 0) {
+            // Pick the first one that matches
+            if (!currentDocenteProgramas.find(cp => cp.path === matched[0].path)) {
+                currentDocenteProgramas.push(matched[0]);
+            }
+        }
+    });
+    
+    list.innerHTML = '';
+    
+    // DEBUG:
+    showToast(`DEBUG: subjects=${uniqueSubjects.size}, progs=${programasAsignaturas.length}, matches=${currentDocenteProgramas.length}`, 'info');
+    
+    if (currentDocenteProgramas.length > 0) {
+        card.style.display = 'block';
+        currentDocenteProgramas.forEach(p => {
+            const item = document.createElement('div');
+            item.style.display = 'flex';
+            item.style.justifyContent = 'space-between';
+            item.style.alignItems = 'center';
+            item.style.padding = '10px';
+            item.style.border = '1px solid var(--border-color)';
+            item.style.borderRadius = '4px';
+            item.style.background = '#f8fafc';
+            
+            item.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 10px; overflow: hidden;">
+                    <i class="fa-solid fa-file-pdf" style="color: #e11d48; font-size: 1.2rem;"></i>
+                    <span style="font-size: 0.9rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.filename}</span>
+                </div>
+                <a href="/api/programas/download?path=${encodeURIComponent(p.path)}" class="btn-pdf" style="padding: 4px 8px; font-size: 0.75rem; text-decoration: none;"><i class="fa-solid fa-download"></i></a>
+            `;
+            list.appendChild(item);
+        });
+    } else {
+        card.style.display = 'none';
+    }
 }
 
 // --- TAB 4: NIVELES ---
@@ -1168,7 +1240,11 @@ function loadNivelSchedule(nivelStr) {
 
 // --- TAB 5: SALAS ---
 function loadSalas() {
-    fetch('/api/salas')
+    const url = new URL('/api/salas', window.location.origin);
+    if (globalFilters.carrera) url.searchParams.append('carrera', globalFilters.carrera);
+    if (globalFilters.jornada) url.searchParams.append('jornada', globalFilters.jornada);
+    
+    fetch(url)
         .then(res => res.json())
         .then(data => {
             if (data.success && !data.empty) {
@@ -1708,4 +1784,286 @@ async function exportAllNivelesPDF() {
             printContainer.innerHTML = ''; // Clean up
         }, 1000);
     }, 1500);
+}
+
+// --- EMAIL DOCENTE LOGIC ---
+async function sendScheduleEmail() {
+    const docenteName = document.getElementById('docente-name').textContent;
+    if (docenteName === 'Seleccione un Docente' || !docenteName) {
+        showToast('Debe seleccionar un docente primero', 'error');
+        return;
+    }
+    
+    const emailsDocentes = {
+        "ABRAHAM REYNALDO BOBADILLA OSSES": "abraham.bobadilla@cloud.uautonoma.cl",
+        "ANGELICA MARIA VILORIA ADRIANZA": "angelica.viloria@cloud.uautonoma.cl",
+        "ANIBAL FERNANDO FERNANDOY ABARCA": "anibal.fernandoy@cloud.uautonoma.cl",
+        "AXEL MAURICIO OVALLE MUÑOZ": "AXEL.OVALLE@CLOUD.UAUTONOMA.CL",
+        "CAMILO ALEJANDRO FUENTES BEALS": "camilo.fuentes5@cloud.uautonoma.cl",
+        "CARLOS RAMIREZ CARRASCO": "carlos.ramirez5@uautonoma.cl",
+        "CRISTIAN ALBERTO SÁEZ MORALES": "cristian.saez@uautonoma.cl",
+        "CRISTOFHER ROJAS ROJAS": "cristofher.rojas@cloud.uautonoma.cl",
+        "DAVID NUÑEZ MALDONADO": "david.nunez@uautonoma.cl",
+        "EMILIO SAURINA LLABRES": "emilio.saurina@cloud.uautonoma.cl",
+        "ENRIQUE FERNANDO VERGARA CUBILLOS": "enrique.vergara@cloud.uautonoma.cl",
+        "FERNANDO JAVIER MORALES ARRIAGADA": "fernando.morales4@cloud.uautonoma.cl",
+        "GIORDANO AARON CASTRO VILLARROEL": "GIORDANO.CASTRO@CLOUD.UAUTONOMA.CL",
+        "GONZALO NICOLAS CARREÑO BAHAMONDEZ": "gonzalo.carreno@cloud.uautonoma.cl",
+        "GUSTAVO RUBIO GONZALEZ": "gustavo.rubio@cloud.uautonoma.cl",
+        "HÉCTOR ANDRÉS ORELLANA ROJAS": "HECTOR.ORELLANA@CLOUD.UAUTONOMA.CL",
+        "JOHAN MANUEL ORTIGOZA RUIZ": "JOHAN.ORTIGOZA@CLOUD.UAUTONOMA.CL",
+        "JOHANNA ALVARADO NEIRA": "johanna.alvarado@uautonoma.cl",
+        "JOHN ALFONSO KANDALAFT LETELIER": "john.kandalaft@cloud.uautonoma.cl",
+        "JUAN VERGAÑO SALAZAR": "juan.vergano@uautonoma.cl",
+        "LUIS ALBERTO MORALES QUINTANA": "luis.morales@cloud.uautonoma.cl",
+        "MARCELO EDUARDO HERNÁNDEZ CARO": "marcelo.hernandez4@cloud.uautonoma.cl",
+        "MARCELO SAN MARTIN LANCTOT": "marcelo.sanmartin@cloud.uautonoma.cl",
+        "MARCOS RODRIGO CONTRERAS FUENTES": "marcos.contreras@cloud.uautonoma.cl",
+        "MARISOL DE LAS MERCEDES PIZARRO LEÓN": "MARISOL.PIZARRO@CLOUD.UAUTONOMA.CL",
+        "NICOLAS GONZALEZ MEDEL": "nicolas.gonzalez@uautonoma.cl",
+        "NICOLÁS ARIEL MEDINA PEÑA": "nicolas.medina5@cloud.uautonoma.cl",
+        "OSCAR IVAN CANDIA AVELLO": "oscar.candia@uautonoma.cl",
+        "PATRICIA ANDREA MOLLER ACUÑA": "PATRICIA.MOLLER@CLOUD.UAUTONOMA.CL",
+        "ROBINSON PATRICIO GÓMEZ NÚÑEZ": "robinson.gomez@cloud.uautonoma.cl",
+        "RODRIGO URZUA LEIVA": "rodrigo.urzua2@cloud.uautonoma.cl",
+        "SOFIA DANIELA TOSSO ALVAREZ": "SOFIA.TOSSO@CLOUD.UAUTONOMA.CL",
+        "TORIBIO ANDRÉS FIGUEROA AGUILAR": "toribio.figueroa@cloud.uautonoma.cl",
+        "WALDO MIGUEL ANGEL SILVA RODRIGUEZ": "WALDO.SILVA@CLOUD.UAUTONOMA.CL",
+        "YOSLAINE RUIZ OTAÑO": "yoslaine.ruiz@cloud.uautonoma.cl"
+    };
+
+    let email = emailsDocentes[docenteName.trim()] || '';
+    
+    // Guess email based on name if not found in dictionary
+    if (!email) {
+        const parts = docenteName.toLowerCase().split(' ').filter(p => p.trim() !== '');
+        if (parts.length >= 2) {
+            email = `${parts[0]}.${parts[1]}@uautonoma.cl`;
+        }
+    }
+    
+    if (typeof html2pdf === 'undefined') {
+        showToast('Error: Librería de PDF no cargada aún', 'error');
+        return;
+    }
+    
+    showToast('Generando PDF y abriendo gestor de correo...', 'success');
+    
+    const element = document.getElementById('docente-timetable');
+    
+    const opt = {
+        margin:       10,
+        filename:     `Horario_${docenteName.replace(/ /g, '_')}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+    };
+    // Copiar el correo al portapapeles de inmediato para evitar problemas de contexto asíncrono
+    if (email) {
+        try {
+            await navigator.clipboard.writeText(email);
+            showToast(`Correo copiado al portapapeles: ${email}. Presiona Ctrl+V en tu correo.`, 'info');
+        } catch (clipErr) {
+            console.log('Clipboard falló:', clipErr);
+        }
+    }
+    
+    try {
+        // Generate Blob
+        const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
+        const file = new File([pdfBlob], opt.filename, { type: 'application/pdf' });
+        
+        let filesToShare = [file];
+        
+        // Try native share API first (works on modern browsers/OS to open Mail with attachment)
+        if (navigator.canShare && navigator.canShare({ files: filesToShare })) {
+            try {
+                
+                await navigator.share({
+                    files: filesToShare,
+                    title: `Horario ${docenteName}`,
+                    text: `Estimado/a ${docenteName},\n\nAdjunto encontrará su horario académico semanal.`
+                });
+                return;
+            } catch (shareError) {
+                console.log('User cancelled share or share failed', shareError);
+                // Fallthrough to fallback
+            }
+        }
+        
+        // Fallback: Download the PDF and open mailto
+        showToast('Descargando PDF(s)... Por favor adjúntelos en su gestor de correo.', 'success');
+        
+        // 1. Trigger Download for Schedule
+        html2pdf().set(opt).from(element).save();
+        
+        // 2. Open Mailto after a slight delay
+        setTimeout(() => {
+            const subject = encodeURIComponent(`Horario Académico - ${docenteName}`);
+            const body = encodeURIComponent(`Estimado/a ${docenteName},\n\nAdjunto encontrará su horario académico semanal.\n\n(Recuerde adjuntar el PDF descargado)\n\nSaludos cordiales.`);
+            window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+        }, 1500);
+
+    } catch (error) {
+        console.error(error);
+        showToast('Error al procesar el PDF o enviar el correo', 'error');
+    }
+}
+
+async function sendProgramasEmail() {
+    if (!selectedDocente) return;
+    
+    if (currentDocenteProgramas.length === 0) {
+        showToast('No hay programas asociados a este docente para enviar.', 'info');
+        return;
+    }
+    
+    const docenteName = selectedDocente.DOCENTE;
+    let email = selectedDocente.CORREO;
+    
+    // Guess email based on name if not found in dictionary
+    if (!email) {
+        const parts = docenteName.toLowerCase().split(' ').filter(p => p.trim() !== '');
+        if (parts.length >= 2) {
+            email = `${parts[0]}.${parts[1]}@uautonoma.cl`;
+        }
+    }
+    
+    // Copiar el correo al portapapeles de inmediato para evitar problemas de contexto asíncrono
+    if (email) {
+        try {
+            await navigator.clipboard.writeText(email);
+            showToast(`Correo copiado al portapapeles: ${email}. Presiona Ctrl+V en tu correo.`, 'info');
+        } catch (clipErr) {
+            console.log('Clipboard falló:', clipErr);
+        }
+    }
+    
+    showToast('Preparando programas para envío...', 'info');
+    
+    let filesToShare = [];
+    
+    // Fetch programs
+    for (const p of currentDocenteProgramas) {
+        try {
+            const resp = await fetch(`/api/programas/download?path=${encodeURIComponent(p.path)}`);
+            if (resp.ok) {
+                const blob = await resp.blob();
+                const pFile = new File([blob], p.filename, { type: 'application/pdf' });
+                filesToShare.push(pFile);
+            }
+        } catch(e) {
+            console.error("Error fetching program PDF", e);
+        }
+    }
+    
+    if (filesToShare.length === 0) {
+        showToast('No se pudo descargar ningún programa.', 'error');
+        return;
+    }
+    
+    // Try native share API first
+    if (navigator.canShare && navigator.canShare({ files: filesToShare })) {
+        try {
+            await navigator.share({
+                files: filesToShare,
+                title: `Programas de Asignaturas - ${docenteName}`,
+                text: `Estimado/a ${docenteName},\n\nAdjunto encontrará los programas de las asignaturas correspondientes.`
+            });
+            return;
+        } catch (shareError) {
+            console.log('User cancelled share or share failed', shareError);
+        }
+    }
+    
+    // Fallback: Download the PDFs and open mailto
+    showToast('Descargando programas... Por favor adjúntelos en su gestor de correo.', 'success');
+    
+    filesToShare.forEach((f, i) => {
+        setTimeout(() => {
+            const url = URL.createObjectURL(f);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = f.name;
+            a.click();
+            URL.revokeObjectURL(url);
+        }, i * 500); // Stagger downloads
+    });
+    
+    // Open Mailto after a slight delay
+    setTimeout(() => {
+        const subject = encodeURIComponent(`Programas de Asignaturas - ${docenteName}`);
+        const body = encodeURIComponent(`Estimado/a ${docenteName},\n\nAdjunto encontrará los programas de las asignaturas correspondientes.\n\n(Recuerde adjuntar los PDFs descargados)\n\nSaludos cordiales.`);
+        window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+    }, filesToShare.length * 500 + 1000);
+}
+
+// --- PROGRAMAS LOGIC ---
+let currentDocenteProgramas = []; // To store programs for the currently selected docente
+
+async function loadProgramas() {
+    try {
+        const response = await fetch('/api/programas');
+        if (response.ok) {
+            programasAsignaturas = await response.json();
+            renderProgramasGrid(programasAsignaturas);
+        }
+    } catch (error) {
+        console.error('Error loading programs:', error);
+    }
+    
+    document.getElementById('search-programas')?.addEventListener('input', (e) => {
+        const term = e.target.value.toLowerCase();
+        const filtered = programasAsignaturas.filter(p => p.filename.toLowerCase().includes(term));
+        renderProgramasGrid(filtered);
+    });
+}
+
+function renderProgramasGrid(programas) {
+    const grid = document.getElementById('programas-grid');
+    if (!grid) return;
+    
+    grid.innerHTML = '';
+    
+    if (programas.length === 0) {
+        grid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #64748b;">No se encontraron programas.</div>';
+        return;
+    }
+    
+    // Group by folder
+    const byFolder = {};
+    programas.forEach(p => {
+        if (!byFolder[p.folder]) byFolder[p.folder] = [];
+        byFolder[p.folder].push(p);
+    });
+    
+    // Sort folders
+    const folders = Object.keys(byFolder).sort();
+    
+    folders.forEach(folder => {
+        const section = document.createElement('div');
+        section.style.gridColumn = '1 / -1';
+        section.innerHTML = `<h3 style="margin-top: 20px; border-bottom: 2px solid var(--border-color); padding-bottom: 5px;">${folder}</h3>`;
+        grid.appendChild(section);
+        
+        byFolder[folder].sort((a,b) => a.filename.localeCompare(b.filename)).forEach(p => {
+            const card = document.createElement('div');
+            card.style.border = '1px solid var(--border-color)';
+            card.style.borderRadius = '6px';
+            card.style.padding = '15px';
+            card.style.display = 'flex';
+            card.style.alignItems = 'center';
+            card.style.gap = '15px';
+            card.style.background = '#f8fafc';
+            
+            card.innerHTML = `
+                <i class="fa-solid fa-file-pdf" style="font-size: 24px; color: #e11d48;"></i>
+                <div style="flex-grow: 1; min-width: 0;">
+                    <div style="font-weight: 500; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${p.filename}">${p.filename}</div>
+                </div>
+                <a href="/api/programas/download?path=${encodeURIComponent(p.path)}" class="btn-pdf" style="padding: 6px 12px; font-size: 0.8rem; text-decoration: none;"><i class="fa-solid fa-download"></i> Descargar</a>
+            `;
+            grid.appendChild(card);
+        });
+    });
 }

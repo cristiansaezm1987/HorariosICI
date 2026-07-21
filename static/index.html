@@ -8,7 +8,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- FontAwesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=8">
+    <!-- HTML2PDF for generating PDFs client-side -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <!-- Chart.js for charts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -44,6 +46,9 @@
                 </button>
                 <button class="nav-item" data-tab="salas">
                     <i class="fa-solid fa-door-open"></i> Salas y Disponibilidad
+                </button>
+                <button class="nav-item" data-tab="programas">
+                    <i class="fa-solid fa-file-pdf"></i> Programas de Asignaturas
                 </button>
             </nav>
 
@@ -352,16 +357,31 @@
                             </div>
                         </div>
 
+                        <!-- Programas Asociados -->
+                        <div class="card mt-4" id="docente-programas-card" style="display: none;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h3><i class="fa-solid fa-file-pdf"></i> Programas de Asignaturas</h3>
+                                <button class="btn-pdf" id="btn-email-programas" style="background: var(--primary-color);"><i class="fa-solid fa-envelope"></i> Enviar Programas por Correo</button>
+                            </div>
+                            <div id="docente-programas-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px;">
+                            </div>
+                        </div>
+
                         <!-- Timetable Grid -->
                         <div class="card timetable-card mt-4">
                             <div class="timetable-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                                 <h3><i class="fa-solid fa-calendar-days"></i> Horario Semanal del Docente</h3>
-                                <button class="btn-pdf" id="btn-pdf-docente"><i class="fa-solid fa-file-pdf"></i> Exportar PDF</button>
+                                <div>
+                                    <button class="btn-pdf" id="btn-email-docente" style="background: var(--primary-color);"><i class="fa-solid fa-envelope"></i> Enviar Horario por Correo</button>
+                                    <button class="btn-pdf" id="btn-pdf-docente"><i class="fa-solid fa-file-pdf"></i> Exportar PDF</button>
+                                </div>
                             </div>
                             <div class="timetable-container" id="docente-timetable">
                                 <!-- Timetable Grid will be generated here -->
                             </div>
                         </div>
+                        
+
                     </div>
                 </div>
             </section>
@@ -519,6 +539,23 @@
                     </div>
                 </div>
             </section>
+
+            <!-- Tab: Programas -->
+            <section id="tab-programas" class="tab-content">
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2><i class="fa-solid fa-file-pdf"></i> Programas de Asignaturas (Repositorio)</h2>
+                        <input type="text" id="search-programas" placeholder="Buscar programa..." style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 4px; width: 300px;">
+                    </div>
+                    
+                    <div id="programas-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px;">
+                        <!-- Programas will be injected here via JS -->
+                        <div style="grid-column: 1 / -1; text-align: center; color: #64748b; padding: 40px;">
+                            <i class="fa-solid fa-circle-notch fa-spin"></i> Cargando programas...
+                        </div>
+                    </div>
+                </div>
+            </section>
         </main>
     </div>
 
@@ -527,6 +564,6 @@
     <!-- Notification Toast -->
     <div id="toast-container" class="toast-container"></div>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=8"></script>
 </body>
 </html>
