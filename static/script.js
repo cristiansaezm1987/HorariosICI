@@ -1957,13 +1957,18 @@ async function sendScheduleEmail() {
     
     const element = document.getElementById('docente-timetable');
     
+    // Calcular tamaño exacto para asegurar una sola hoja
+    const rect = element.getBoundingClientRect();
+    const ratio = rect.height / rect.width;
+    const pdfWidth = 297; // Ancho A4 apaisado en mm
+    const pdfHeight = (pdfWidth * ratio) + 20; // + 20mm de márgenes
+    
     const opt = {
         margin:       10,
         filename:     `Horario_${docenteName.replace(/ /g, '_')}.pdf`,
         image:        { type: 'jpeg', quality: 0.98 },
         html2canvas:  { scale: 2, useCORS: true },
-        jsPDF:        { unit: 'mm', format: 'a3', orientation: 'landscape' },
-        pagebreak:    { mode: 'avoid-all' }
+        jsPDF:        { unit: 'mm', format: [pdfWidth, pdfHeight], orientation: 'portrait' }
     };
     // Copiar el correo al portapapeles de inmediato para evitar problemas de contexto asíncrono
     if (email) {
@@ -2352,13 +2357,19 @@ async function sendTodoEmail(docente) {
         
         // 1. Horario
         const element = document.getElementById('docente-timetable');
+        
+        // Calcular tamaño exacto para asegurar una sola hoja
+        const rect = element.getBoundingClientRect();
+        const ratio = rect.height / rect.width;
+        const pdfWidth = 297; 
+        const pdfHeight = (pdfWidth * ratio) + 20; 
+        
         const opt = {
             margin:       10,
             filename:     `Horario_${docente.DOCENTE.replace(/ /g, '_')}.pdf`,
             image:        { type: 'jpeg', quality: 0.98 },
             html2canvas:  { scale: 2, useCORS: true },
-            jsPDF:        { unit: 'mm', format: 'a3', orientation: 'landscape' },
-            pagebreak:    { mode: 'avoid-all' }
+            jsPDF:        { unit: 'mm', format: [pdfWidth, pdfHeight], orientation: 'portrait' }
         };
         const pdfWorker = await html2pdf().set(opt).from(element).output('blob');
         allFiles.push(new File([pdfWorker], opt.filename, { type: 'application/pdf' }));
