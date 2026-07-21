@@ -563,6 +563,9 @@ def get_asignaturas():
 
 @app.route('/api/docentes', methods=['GET'])
 def get_docentes():
+    carrera = request.args.get('carrera')
+    jornada = request.args.get('jornada')
+    
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -571,23 +574,41 @@ def get_docentes():
         if cursor.fetchone()[0] == 0:
             return jsonify({'success': True, 'empty': True})
             
-        # Query distinct teachers and their profile fields (taking the most frequent or first one)
-        # We also want to compute their total hours
-        cursor.execute("""
+        base_cond = ["DOCENTE IS NOT NULL", "DOCENTE != ''"]
+        base_params = []
+        if carrera:
+            base_cond.append("CARRERA = ?")
+            base_params.append(carrera)
+        if jornada:
+            base_cond.append("JORNADA = ?")
+            base_params.append(jornada)
+            
+        where_clause = " AND ".join(base_cond)
+
+        cursor.execute(f"""
             SELECT DOCENTE, ID_DOCENTE, GRADO, TIPO_CONTRATO, JERARQUIA, CARGO, SEDE_DOCENTE
             FROM planificacion
-            WHERE DOCENTE IS NOT NULL AND DOCENTE != ''
+            WHERE {where_clause}
             GROUP BY DOCENTE
             ORDER BY DOCENTE
-        """)
+        """, base_params)
         teachers = [dict(r) for r in cursor.fetchall()]
         
         # For each teacher, find unique subjects they teach and sum HORAS_TOTALES
         for t in teachers:
             docente_name = t['DOCENTE']
             
-            # Subquery to get distinct NRCs for this teacher and their properties, calculating weekly blocks as HORAS_TOTALES
-            cursor.execute("""
+            sub_cond = ["DOCENTE = ?"]
+            sub_params = [docente_name]
+            if carrera:
+                sub_cond.append("CARRERA = ?")
+                sub_params.append(carrera)
+            if jornada:
+                sub_cond.append("JORNADA = ?")
+                sub_params.append(jornada)
+            sub_where = " AND ".join(sub_cond)
+
+            cursor.execute(f"""
                 SELECT NRC, NRC_PADRE, TITULO, MATERIA, CURSO, SECCION, 
                        (SUM(CASE WHEN LUNES='Y' THEN 1 ELSE 0 END) +
                         SUM(CASE WHEN MARTES='Y' THEN 1 ELSE 0 END) +
@@ -598,9 +619,9 @@ def get_docentes():
                         SUM(CASE WHEN DOMINGO='Y' THEN 1 ELSE 0 END)) as HORAS_TOTALES,
                        TIPO_HORARIO
                 FROM planificacion
-                WHERE DOCENTE = ?
+                WHERE {sub_where}
                 GROUP BY NRC
-            """, (docente_name,))
+            """, sub_params)
             subjects = [dict(r) for r in cursor.fetchall()]
             
             t['asignaturas'] = subjects

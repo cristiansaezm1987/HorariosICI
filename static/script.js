@@ -957,7 +957,11 @@ function navigateToDocente(nombre) {
     // Mark the target name so selectDocente picks it
     const targetName = nombre.trim();
 
-    fetch('/api/docentes')
+    const url = new URL('/api/docentes', window.location.origin);
+    if (globalFilters.carrera) url.searchParams.append('carrera', globalFilters.carrera);
+    if (globalFilters.jornada) url.searchParams.append('jornada', globalFilters.jornada);
+
+    fetch(url)
         .then(res => res.json())
         .then(data => {
             if (data.success && !data.empty) {
@@ -987,7 +991,11 @@ function navigateToDocente(nombre) {
 
 // --- TAB 3: DOCENTES ---
 function loadDocentes() {
-    fetch('/api/docentes')
+    const url = new URL('/api/docentes', window.location.origin);
+    if (globalFilters.carrera) url.searchParams.append('carrera', globalFilters.carrera);
+    if (globalFilters.jornada) url.searchParams.append('jornada', globalFilters.jornada);
+    
+    fetch(url)
         .then(res => res.json())
         .then(data => {
             if (data.success && !data.empty) {
