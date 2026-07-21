@@ -2191,7 +2191,7 @@ async function loadDocumentos() {
         } else {
             const grid = document.getElementById('documentos-grid');
             if (grid) {
-                grid.innerHTML = \<div style=\"grid-column: 1 / -1; text-align: center; padding: 40px; color: #e11d48;\"><i class=\"fa-solid fa-triangle-exclamation\"></i> Error al cargar documentos.</div>\;
+                grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #e11d48;"><i class="fa-solid fa-triangle-exclamation"></i> Error al cargar documentos.</div>`;
             }
         }
     } catch (error) {
@@ -2206,7 +2206,7 @@ function renderDocumentosGrid(documentos) {
     grid.innerHTML = '';
     
     if (documentos.length === 0) {
-        grid.innerHTML = \<div style=\"grid-column: 1 / -1; text-align: center; padding: 40px; color: #64748b;\">No se encontraron documentos en el repositorio.</div>\;
+        grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #64748b;">No se encontraron documentos en el repositorio.</div>`;
         return;
     }
     
@@ -2220,13 +2220,13 @@ function renderDocumentosGrid(documentos) {
         card.style.gap = '15px';
         card.style.background = '#f8fafc';
         
-        card.innerHTML = \
-            <i class=\"fa-solid fa-file-contract\" style=\"font-size: 24px; color: var(--secondary-color);\"></i>
-            <div style=\"flex-grow: 1; min-width: 0;\">
-                <div style=\"font-weight: 500; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;\" title=\"\\">\</div>
+        card.innerHTML = `
+            <i class="fa-solid fa-file-contract" style="font-size: 24px; color: var(--secondary-color);"></i>
+            <div style="flex-grow: 1; min-width: 0;">
+                <div style="font-weight: 500; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${doc.filename}">${doc.filename}</div>
             </div>
-            <a href=\"/static/documentos/\\" download=\"\\" class=\"btn-pdf\" style=\"background: var(--secondary-color); padding: 6px 12px; font-size: 0.8rem; text-decoration: none;\"><i class=\"fa-solid fa-download\"></i> Descargar</a>
-        \;
+            <a href="/static/documentos/${doc.path.replace(/\\\\/g, '/')}" download="${doc.filename}" class="btn-pdf" style="background: var(--secondary-color); padding: 6px 12px; font-size: 0.8rem; text-decoration: none;"><i class="fa-solid fa-download"></i> Descargar</a>
+        `;
         grid.appendChild(card);
     });
 }
