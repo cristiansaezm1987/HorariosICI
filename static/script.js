@@ -80,7 +80,7 @@ function initApp() {
 
 async function checkAuth() {
     try {
-        const res = await fetch('/api/check-auth');
+        const res = await fetch('/api/check-auth?_t=' + Date.now());
         const data = await res.json();
         if (data.logged_in) {
             showApp();
@@ -110,7 +110,7 @@ function checkDatabaseStatus() {
     const statusDiv = document.getElementById('load-status');
     statusDiv.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Verificando datos...';
     
-    fetch('/api/summary')
+    fetch('/api/summary?_t=' + Date.now())
         .then(res => {
             if (res.status === 401) {
                 showLogin();
@@ -736,7 +736,7 @@ function loadGlobalFilters() {
 
 // --- TAB 1: DASHBOARD ---
 function loadDashboard() {
-    fetch('/api/summary')
+    fetch('/api/summary?_t=' + Date.now())
         .then(res => res.json())
         .then(data => {
             if (data.success && !data.empty) {
@@ -2108,7 +2108,7 @@ let currentDocenteProgramas = []; // To store programs for the currently selecte
 
 async function loadProgramas() {
     try {
-        const response = await fetch('/api/programas');
+        const response = await fetch('/api/programas?_t=' + Date.now());
         if (response.ok) {
             programasAsignaturas = await response.json();
             renderProgramasGrid(programasAsignaturas);
@@ -2184,7 +2184,7 @@ function renderProgramasGrid(programas) {
 
 async function loadDocumentos() {
     try {
-        const response = await fetch('/api/documentos');
+        const response = await fetch('/api/documentos?_t=' + Date.now());
         if (response.ok) {
             documentosInstitucionales = await response.json();
             renderDocumentosGrid(documentosInstitucionales);
