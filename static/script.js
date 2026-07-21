@@ -2326,15 +2326,13 @@ document.getElementById('btn-enviar-todo')?.addEventListener('click', async () =
 });
 
 async function sendTodoEmail(docente) {
-    let defaultEmail = emailsDocentes[docente.DOCENTE.trim()] || '';
-    if (!defaultEmail) {
+    let email = emailsDocentes[docente.DOCENTE.trim()] || '';
+    if (!email) {
         const parts = docente.DOCENTE.toLowerCase().split(' ').filter(p => p.trim() !== '');
         if (parts.length >= 2) {
-            defaultEmail = `${parts[0]}.${parts[1]}@uautonoma.cl`;
+            email = `${parts[0]}.${parts[1]}@uautonoma.cl`;
         }
     }
-    const email = prompt('Ingrese el correo del docente para enviar todo consolidado:', defaultEmail);
-    if (email === null) return;
     
     const statusToast = document.createElement('div');
     statusToast.className = 'toast info';
