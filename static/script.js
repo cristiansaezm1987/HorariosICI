@@ -1131,9 +1131,41 @@ function selectDocente(docente) {
         .catch(err => console.error('Error loading schedule for docente:', err));
 }
 
+// Utility to robustly copy text to clipboard
+function copyToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        return navigator.clipboard.writeText(text);
+    } else {
+        // Fallback for non-HTTPS or older browsers
+        return new Promise((resolve, reject) => {
+            try {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                textArea.style.top = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                const successful = document.execCommand('copy');
+                textArea.remove();
+                if (successful) resolve();
+                else reject(new Error('execCommand copy failed'));
+            } catch (err) {
+                reject(err);
+            }
+        });
+    }
+}
+
 function normalizeText(text) {
     if (!text) return "";
-    return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\ufffd/g, "").toLowerCase().trim();
+    let n = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\ufffd/g, "").toLowerCase().trim();
+    
+    // Manual aliases
+    if (n.includes("dcho empresa y ambiental")) return "derecho de empresa y ambiental";
+    
+    return n;
 }
 
 function matchAndRenderDocenteProgramas(scheduleData) {
@@ -1861,7 +1893,7 @@ async function sendScheduleEmail() {
     // Copiar el correo al portapapeles de inmediato para evitar problemas de contexto asíncrono
     if (email) {
         try {
-            await navigator.clipboard.writeText(email);
+            await copyToClipboard(email);
             showToast(`Correo copiado al portapapeles: ${email}. Presiona Ctrl+V en tu correo.`, 'info');
         } catch (clipErr) {
             console.log('Clipboard falló:', clipErr);
@@ -1932,7 +1964,7 @@ async function sendProgramasEmail() {
     // Copiar el correo al portapapeles de inmediato para evitar problemas de contexto asíncrono
     if (email) {
         try {
-            await navigator.clipboard.writeText(email);
+            await copyToClipboard(email);
             showToast(`Correo copiado al portapapeles: ${email}. Presiona Ctrl+V en tu correo.`, 'info');
         } catch (clipErr) {
             console.log('Clipboard falló:', clipErr);
