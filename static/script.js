@@ -1241,6 +1241,7 @@ function normalizeText(text) {
     // Manual aliases
     if (n.includes("dcho empresa y ambiental")) return "derecho de empresa y ambiental";
     if (n.includes("consul de emp")) return "consultoria de empresas";
+    if (n.includes("adm. y direcc")) return "administracion y direccion de proyectos";
     
     return n;
 }
