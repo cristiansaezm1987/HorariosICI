@@ -1265,8 +1265,16 @@ function matchAndRenderDocenteProgramas(scheduleData) {
     
     uniqueSubjects.forEach(subjectName => {
         // Find best match in programasAsignaturas
-        // Check if subjectName is a substring of clean_name or vice versa
-        const matched = programasAsignaturas.filter(p => p.clean_name.includes(subjectName) || subjectName.includes(p.clean_name));
+        // First try exact match
+        let matched = programasAsignaturas.filter(p => p.clean_name === subjectName);
+        
+        // Fallback to substring match if no exact match
+        if (matched.length === 0) {
+            matched = programasAsignaturas.filter(p => p.clean_name.includes(subjectName) || subjectName.includes(p.clean_name));
+            // Sort by length descending to prioritize more specific matches (e.g. 'ingles ii' over 'ingles i')
+            matched.sort((a, b) => b.clean_name.length - a.clean_name.length);
+        }
+        
         if (matched.length > 0) {
             // Pick the first one that matches
             if (!currentDocenteProgramas.find(cp => cp.path === matched[0].path)) {
