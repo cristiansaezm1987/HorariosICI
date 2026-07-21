@@ -2355,7 +2355,7 @@ async function sendTodoEmail(docente) {
     
 Junto con saludar, adjunto encontrará su horario académico, programas de asignatura, reglamento general del estudiante y calendario académico. 
 
-El syllabus lo deberá enviar antes del 31 de julio del presente, también recordar que es obligación presentar a sus alumnos durante las primeras clases.
+El syllabus lo deberá enviar antes del 31 de julio, también recordar que es obligación presentar a sus alumnos durante las primeras clases.
 
 Importante reiterar, que durante el semestre se aplicará el reglamento general del estudiante en su totalidad, por lo que ya no va la prueba sustitutiva, sino examen según el siguiente artículo.
  
