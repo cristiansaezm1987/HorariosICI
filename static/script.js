@@ -2292,20 +2292,16 @@ document.getElementById('btn-email-documentos')?.addEventListener('click', async
 
 async function sendDocumentosEmail() {
     try {
-        let saludo = `Adjunto envío reglamentación institucional y documentos de interés.`;
+        let saludo = `Adjunto envío reglamentación institucional y documentos de interés.
+
+Adicionalmente, puede descargar el Formato de Syllabus desde el siguiente enlace:
+https://admuautonoma365-my.sharepoint.com/:w:/g/personal/cristian_saez_uautonoma_cl/IQBECBDvI7HHTYcS-H7UXTL3Ae7y9XhQsFwVZ6tRqxxDSE0?e=RgvCHp`;
+
         const shareableFiles = [];
-        const docLinks = [];
         
         const filePromises = documentosInstitucionales.map(async doc => {
-            const isDocx = doc.filename.toLowerCase().endsWith('.docx') || doc.filename.toLowerCase().endsWith('.doc');
             const pathParts = doc.path.replace(/\\/g, '/').split('/');
             const encodedPath = pathParts.map(p => encodeURIComponent(p)).join('/');
-            
-            if (isDocx) {
-                const link = `${window.location.origin}/documentos/${encodedPath}`;
-                docLinks.push(`- ${doc.filename}: ${link}`);
-                return null;
-            }
             
             const url = `/documentos/${encodedPath}`;
             const res = await fetch(url);
@@ -2316,10 +2312,6 @@ async function sendDocumentosEmail() {
         
         const files = await Promise.all(filePromises);
         shareableFiles.push(...files.filter(f => f !== null));
-        
-        if (docLinks.length > 0) {
-            saludo += `\n\nAdicionalmente, puede descargar los siguientes documentos desde estos enlaces (el correo bloquea adjuntarlos automáticamente):\n${docLinks.join('\n')}`;
-        }
         
         try {
             await copyToClipboard(saludo);
@@ -2369,23 +2361,10 @@ Artículo 27. La nota final mínima para la aprobación de las asignaturas será
 Este examen se realizará en las fechas definidas en el calendario académico. Si el estudiante obtiene en examen de repetición una nota igual o superior a 4,0, la nota final de la asignatura será 4,0. En caso contrario, mantendrá la nota obtenida durante el período académico.
 Sus cursos deberán estar cargados en CANVAS durante la semana. 
 Se realizó revisión de salas, sin embargo, esto podría sufrir modificaciones con el paso de los días.  
-Un cordial saludo y que sea un exitoso semestre Primavera 2026.`;
+Un cordial saludo y que sea un exitoso semestre Primavera 2026.
 
-    const docLinks = [];
-    if (documentosInstitucionales && documentosInstitucionales.length > 0) {
-        for (const doc of documentosInstitucionales) {
-            if (doc.filename.toLowerCase().endsWith('.docx') || doc.filename.toLowerCase().endsWith('.doc')) {
-                const pathParts = doc.path.replace(/\\/g, '/').split('/');
-                const encodedPath = pathParts.map(p => encodeURIComponent(p)).join('/');
-                const link = `${window.location.origin}/documentos/${encodedPath}`;
-                docLinks.push(`- ${doc.filename}:\n  ${link}`);
-            }
-        }
-    }
-    
-    if (docLinks.length > 0) {
-        saludo += `\n\nAdicionalmente, puede descargar los siguientes documentos desde estos enlaces (el correo bloquea adjuntarlos automáticamente):\n${docLinks.join('\n')}`;
-    }
+Adicionalmente, puede descargar el Formato de Syllabus desde el siguiente enlace:
+https://admuautonoma365-my.sharepoint.com/:w:/g/personal/cristian_saez_uautonoma_cl/IQBECBDvI7HHTYcS-H7UXTL3Ae7y9XhQsFwVZ6tRqxxDSE0?e=RgvCHp`;
 
     try {
         await copyToClipboard(saludo);
@@ -2431,9 +2410,6 @@ Un cordial saludo y que sea un exitoso semestre Primavera 2026.`;
         // 3. Documentos
         if (documentosInstitucionales && documentosInstitucionales.length > 0) {
             const docPromises = documentosInstitucionales.map(async doc => {
-                if (doc.filename.toLowerCase().endsWith('.docx') || doc.filename.toLowerCase().endsWith('.doc')) {
-                    return null;
-                }
                 const pathParts = doc.path.replace(/\\/g, '/').split('/');
                 const encodedPath = pathParts.map(p => encodeURIComponent(p)).join('/');
                 const url = `/documentos/${encodedPath}`;
