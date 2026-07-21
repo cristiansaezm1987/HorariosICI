@@ -1197,9 +1197,6 @@ function matchAndRenderDocenteProgramas(scheduleData) {
     
     list.innerHTML = '';
     
-    // DEBUG:
-    showToast(`DEBUG: subjects=${uniqueSubjects.size}, progs=${programasAsignaturas.length}, matches=${currentDocenteProgramas.length}`, 'info');
-    
     if (currentDocenteProgramas.length > 0) {
         card.style.display = 'block';
         currentDocenteProgramas.forEach(p => {
