@@ -5,6 +5,10 @@ import re
 import tempfile
 import shutil
 from flask import Flask, request, jsonify, send_from_directory
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 
@@ -713,24 +717,50 @@ def get_salas():
         if cursor.fetchone()[0] == 0:
             return jsonify({'success': True, 'empty': True})
             
-        # Get list of unique classrooms and their properties
-        cursor.execute("""
+        carrera = request.args.get('carrera')
+        jornada = request.args.get('jornada')
+        
+        # Build conditions for rooms
+        room_cond = ["COD_SALON IS NOT NULL", "COD_SALON != ''"]
+        room_params = []
+        if carrera:
+            room_cond.append("CARRERA = ?")
+            room_params.append(carrera)
+        if jornada:
+            room_cond.append("JORNADA = ?")
+            room_params.append(jornada)
+            
+        where_clause = " AND ".join(room_cond)
+        
+        # Get list of unique classrooms and their properties based on filtered sections
+        cursor.execute(f"""
             SELECT COD_SALON, SALON, CAPACIDAD_SALON, EDIFICIO, COD_EDIFICIO
             FROM planificacion
-            WHERE COD_SALON IS NOT NULL AND COD_SALON != ''
+            WHERE {where_clause}
             GROUP BY COD_SALON
             ORDER BY EDIFICIO, COD_SALON
-        """)
+        """, room_params)
         rooms = [dict(r) for r in cursor.fetchall()]
         
         # Calculate occupancy count (number of sessions) for each room
         for r in rooms:
-            cursor.execute("""
+            # Calculate occupancy count (number of sessions) for each room based on filters
+            occ_cond = ["COD_SALON = ?", "HORA_INCIO IS NOT NULL", "HORA_INCIO != ''", "(LUNES='Y' OR MARTES='Y' OR MIERCOLES='Y' OR JUEVES='Y' OR VIERNES='Y' OR SABADO='Y' OR DOMINGO='Y')"]
+            occ_params = [r['COD_SALON']]
+            if carrera:
+                occ_cond.append("CARRERA = ?")
+                occ_params.append(carrera)
+            if jornada:
+                occ_cond.append("JORNADA = ?")
+                occ_params.append(jornada)
+                
+            occ_where = " AND ".join(occ_cond)
+            
+            cursor.execute(f"""
                 SELECT COUNT(*) 
                 FROM planificacion 
-                WHERE COD_SALON = ? AND HORA_INCIO IS NOT NULL AND HORA_INCIO != ''
-                      AND (LUNES='Y' OR MARTES='Y' OR MIERCOLES='Y' OR JUEVES='Y' OR VIERNES='Y' OR SABADO='Y' OR DOMINGO='Y')
-            """, (r['COD_SALON'],))
+                WHERE {occ_where}
+            """, occ_params)
             r['ocupacion_sesiones'] = cursor.fetchone()[0]
             
         return jsonify({
@@ -915,6 +945,115 @@ def get_schedule():
         return jsonify({'success': False, 'message': str(e)}), 500
     finally:
         conn.close()
+
+@app.route('/api/send_email', methods=['POST'])
+def send_email():
+    try:
+        email_to = request.form.get('email')
+        docente = request.form.get('docente', 'Docente')
+        pdf_file = request.files.get('pdf')
+        
+        if not email_to or not pdf_file:
+            return jsonify({'success': False, 'message': 'Faltan datos (correo o archivo)'}), 400
+            
+        # Get SMTP config from env vars
+        smtp_server = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
+        smtp_port = int(os.environ.get('SMTP_PORT', 587))
+        smtp_user = os.environ.get('SMTP_USER')
+        smtp_pass = os.environ.get('SMTP_PASS')
+        
+        if not smtp_user or not smtp_pass:
+            # Fake success for testing if env vars are not set
+            print(f"[MOCK EMAIL] Enviar a {email_to} - SMTP no configurado.")
+            return jsonify({'success': True, 'message': 'Simulado (Sin credenciales SMTP)'})
+            
+        # Build message
+        msg = MIMEMultipart()
+        msg['From'] = smtp_user
+        msg['To'] = email_to
+        msg['Subject'] = f"Horario Académico - {docente}"
+        
+        body = f"Estimado/a {docente},\n\nAdjunto encontrará su horario académico semanal.\n\nSaludos cordiales,\nSistema de Planificación."
+        msg.attach(MIMEText(body, 'plain'))
+        
+        # Attach PDF
+        part = MIMEApplication(pdf_file.read(), Name=f"Horario_{docente.replace(' ', '_')}.pdf")
+        part['Content-Disposition'] = f'attachment; filename="Horario_{docente.replace(" ", "_")}.pdf"'
+        msg.attach(part)
+        
+        # Send
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(smtp_user, smtp_pass)
+        server.send_message(msg)
+        server.quit()
+        
+        return jsonify({'success': True, 'message': 'Enviado correctamente'})
+    except Exception as e:
+        print(f"Error sending email: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+PROGRAMAS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'programas')
+
+import unicodedata
+def normalize_text(text):
+    if not text:
+        return ""
+    text = unicodedata.normalize('NFD', text).encode('ascii', 'ignore').decode('utf-8')
+    return text.lower().replace('\ufffd', '').strip()
+
+@app.route('/api/programas', methods=['GET'])
+def get_programas():
+    if not os.path.exists(PROGRAMAS_DIR):
+        return jsonify([])
+    
+    programas = []
+    for root, dirs, files in os.walk(PROGRAMAS_DIR):
+        for file in files:
+            if file.lower().endswith('.pdf'):
+                # Try to extract subject name: usually "CODE Subject Name.pdf"
+                # Strip extension
+                name_no_ext = file[:-4]
+                # Try to find the first space
+                parts = name_no_ext.split(' ', 1)
+                if len(parts) == 2:
+                    clean_name = normalize_text(parts[1])
+                else:
+                    clean_name = normalize_text(name_no_ext)
+                
+                # Get Nivel from folder name if possible
+                folder_name = os.path.basename(root)
+                
+                # Keep absolute path safe for download
+                rel_path = os.path.relpath(os.path.join(root, file), PROGRAMAS_DIR)
+                
+                programas.append({
+                    'filename': file,
+                    'path': rel_path,
+                    'clean_name': clean_name,
+                    'folder': folder_name
+                })
+    
+    return jsonify(programas)
+
+@app.route('/api/programas/download', methods=['GET'])
+def download_programa():
+    rel_path = request.args.get('path')
+    if not rel_path:
+        return "Path is required", 400
+    
+    # Secure the path
+    safe_path = os.path.normpath(os.path.join(PROGRAMAS_DIR, rel_path))
+    if not safe_path.startswith(PROGRAMAS_DIR):
+        return "Invalid path", 403
+        
+    if not os.path.exists(safe_path):
+        return "File not found", 404
+        
+    dir_name = os.path.dirname(safe_path)
+    file_name = os.path.basename(safe_path)
+    
+    return send_from_directory(dir_name, file_name, as_attachment=True)
 
 if __name__ == '__main__':
     # Ensure database is initialized
