@@ -1961,8 +1961,9 @@ async function sendScheduleEmail() {
         margin:       10,
         filename:     `Horario_${docenteName.replace(/ /g, '_')}.pdf`,
         image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+        html2canvas:  { scale: 2, useCORS: true, windowWidth: 1000 },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak:    { mode: 'avoid-all' }
     };
     // Copiar el correo al portapapeles de inmediato para evitar problemas de contexto asíncrono
     if (email) {
@@ -1976,9 +1977,7 @@ async function sendScheduleEmail() {
     
     try {
         // Generate Blob
-        element.classList.add('exporting-pdf');
         const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
-        element.classList.remove('exporting-pdf');
         const file = new File([pdfBlob], opt.filename, { type: 'application/pdf' });
         
         let filesToShare = [file];
@@ -2357,12 +2356,11 @@ async function sendTodoEmail(docente) {
             margin:       10,
             filename:     `Horario_${docente.DOCENTE.replace(/ /g, '_')}.pdf`,
             image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, useCORS: true },
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            html2canvas:  { scale: 2, useCORS: true, windowWidth: 1000 },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            pagebreak:    { mode: 'avoid-all' }
         };
-        element.classList.add('exporting-pdf');
         const pdfWorker = await html2pdf().set(opt).from(element).output('blob');
-        element.classList.remove('exporting-pdf');
         allFiles.push(new File([pdfWorker], opt.filename, { type: 'application/pdf' }));
         
         // 2. Programas
