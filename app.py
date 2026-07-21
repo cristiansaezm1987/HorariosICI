@@ -93,6 +93,28 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+def calculate_blocks(hora_inicio, hora_fin):
+    if not hora_inicio or not hora_fin: return 0
+    try:
+        hi = int(str(hora_inicio).replace(':', ''))
+        hf = int(str(hora_fin).replace(':', ''))
+        
+        # SCHEDULE_BLOCKS ranges in integer format
+        ranges = [
+            (800, 840), (841, 920), (930, 1010), (1011, 1050),
+            (1100, 1140), (1141, 1220), (1230, 1310), (1311, 1350),
+            (1400, 1440), (1441, 1520), (1530, 1610), (1611, 1650),
+            (1700, 1740), (1741, 1820)
+        ]
+        
+        blocks = 0
+        for r_start, r_end in ranges:
+            if hi <= r_start and hf >= r_end:
+                blocks += 1
+        return blocks
+    except:
+        return 0
+
 def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -479,16 +501,10 @@ def get_asignaturas():
         # Build query for all unique sections (NRCs) with calculated weekly blocks as HORAS_TOTALES
         query = """
             SELECT NRC, NRC_PADRE, MATERIA, CURSO, TITULO, SECCION, 
-                   (SUM(CASE WHEN LUNES='Y' THEN 1 ELSE 0 END) +
-                    SUM(CASE WHEN MARTES='Y' THEN 1 ELSE 0 END) +
-                    SUM(CASE WHEN MIERCOLES='Y' THEN 1 ELSE 0 END) +
-                    SUM(CASE WHEN JUEVES='Y' THEN 1 ELSE 0 END) +
-                    SUM(CASE WHEN VIERNES='Y' THEN 1 ELSE 0 END) +
-                    SUM(CASE WHEN SABADO='Y' THEN 1 ELSE 0 END) +
-                    SUM(CASE WHEN DOMINGO='Y' THEN 1 ELSE 0 END)) as HORAS_TOTALES,
+                   LUNES, MARTES, MIERCOLES, JUEVES, VIERNES, SABADO, DOMINGO,
+                   HORA_INCIO, HORA_FIN,
                    TIPO_HORARIO, CUPO, INSCRITOS, DISPONIBLES, DOCENTE, NIVEL, CARRERA, JORNADA
             FROM planificacion
-            GROUP BY NRC
         """
         # Apply filters if present
         conditions = []
@@ -504,35 +520,49 @@ def get_asignaturas():
             params.append(jornada)
             
         if conditions:
-            # We must apply filters in a subquery or filter unique NRCs carefully.
-            # Let's filter the rows first, then group by NRC.
-            query = f"""
-                SELECT NRC, NRC_PADRE, MATERIA, CURSO, TITULO, SECCION, 
-                       (SUM(CASE WHEN LUNES='Y' THEN 1 ELSE 0 END) +
-                        SUM(CASE WHEN MARTES='Y' THEN 1 ELSE 0 END) +
-                        SUM(CASE WHEN MIERCOLES='Y' THEN 1 ELSE 0 END) +
-                        SUM(CASE WHEN JUEVES='Y' THEN 1 ELSE 0 END) +
-                        SUM(CASE WHEN VIERNES='Y' THEN 1 ELSE 0 END) +
-                        SUM(CASE WHEN SABADO='Y' THEN 1 ELSE 0 END) +
-                        SUM(CASE WHEN DOMINGO='Y' THEN 1 ELSE 0 END)) as HORAS_TOTALES,
-                       TIPO_HORARIO, CUPO, INSCRITOS, DISPONIBLES, DOCENTE, NIVEL, CARRERA, JORNADA
-                FROM planificacion
-                WHERE {' AND '.join(conditions)}
-                GROUP BY NRC
-            """
-            
+            query += f" WHERE {' AND '.join(conditions)}"
+
         cursor.execute(query, params)
-        rows = [dict(r) for r in cursor.fetchall()]
+        rows = cursor.fetchall()
+
+        nrc_dict = {}
+        for r in rows:
+            nrc = r['NRC']
+            if nrc not in nrc_dict:
+                nrc_dict[nrc] = {
+                    'NRC': nrc,
+                    'NRC_PADRE': r['NRC_PADRE'],
+                    'MATERIA': r['MATERIA'],
+                    'CURSO': r['CURSO'],
+                    'TITULO': r['TITULO'],
+                    'SECCION': r['SECCION'],
+                    'TIPO_HORARIO': r['TIPO_HORARIO'],
+                    'CUPO': r['CUPO'],
+                    'INSCRITOS': r['INSCRITOS'],
+                    'DISPONIBLES': r['DISPONIBLES'],
+                    'DOCENTE': r['DOCENTE'],
+                    'NIVEL': r['NIVEL'],
+                    'CARRERA': r['CARRERA'],
+                    'JORNADA': r['JORNADA'],
+                    'HORAS_TOTALES': 0
+                }
+            
+            days = 0
+            for day in ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO']:
+                if r[day] == 'Y':
+                    days += 1
+            blocks = calculate_blocks(r['HORA_INCIO'], r['HORA_FIN'])
+            nrc_dict[nrc]['HORAS_TOTALES'] += (days * blocks)
+
+        subjects = list(nrc_dict.values())
         
-        # Build parent-child relationships
-        nrc_map = {r['NRC']: r for r in rows}
+        # Build tree structure
         parents = []
         children_by_parent = {}
-        
-        for r in rows:
+        for r in subjects:
             parent_nrc = r['NRC_PADRE']
             # If the course specifies a parent, and that parent actually exists in our data
-            if parent_nrc and parent_nrc in nrc_map:
+            if parent_nrc:
                 if parent_nrc not in children_by_parent:
                     children_by_parent[parent_nrc] = []
                 children_by_parent[parent_nrc].append(r)
@@ -615,23 +645,44 @@ def get_docentes():
             sub_where = " AND ".join(sub_cond)
 
             cursor.execute(f"""
-                SELECT NRC, NRC_PADRE, TITULO, MATERIA, CURSO, SECCION, 
-                       (SUM(CASE WHEN LUNES='Y' THEN 1 ELSE 0 END) +
-                        SUM(CASE WHEN MARTES='Y' THEN 1 ELSE 0 END) +
-                        SUM(CASE WHEN MIERCOLES='Y' THEN 1 ELSE 0 END) +
-                        SUM(CASE WHEN JUEVES='Y' THEN 1 ELSE 0 END) +
-                        SUM(CASE WHEN VIERNES='Y' THEN 1 ELSE 0 END) +
-                        SUM(CASE WHEN SABADO='Y' THEN 1 ELSE 0 END) +
-                        SUM(CASE WHEN DOMINGO='Y' THEN 1 ELSE 0 END)) as HORAS_TOTALES,
-                       TIPO_HORARIO
+                SELECT NRC, NRC_PADRE, TITULO, MATERIA, CURSO, SECCION, TIPO_HORARIO,
+                       LUNES, MARTES, MIERCOLES, JUEVES, VIERNES, SABADO, DOMINGO,
+                       HORA_INCIO, HORA_FIN
                 FROM planificacion
                 WHERE {sub_where}
-                GROUP BY NRC
             """, sub_params)
-            subjects = [dict(r) for r in cursor.fetchall()]
+            rows = cursor.fetchall()
+            
+            # Group by NRC in python to calculate total hours correctly
+            nrc_dict = {}
+            for r in rows:
+                nrc = r['NRC']
+                if nrc not in nrc_dict:
+                    nrc_dict[nrc] = {
+                        'NRC': nrc,
+                        'NRC_PADRE': r['NRC_PADRE'],
+                        'TITULO': r['TITULO'],
+                        'MATERIA': r['MATERIA'],
+                        'CURSO': r['CURSO'],
+                        'SECCION': r['SECCION'],
+                        'TIPO_HORARIO': r['TIPO_HORARIO'],
+                        'HORAS_TOTALES': 0
+                    }
+                
+                # Count days this specific row is active
+                days = 0
+                for day in ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO']:
+                    if r[day] == 'Y':
+                        days += 1
+                
+                # Calculate blocks per day
+                blocks_per_day = calculate_blocks(r['HORA_INCIO'], r['HORA_FIN'])
+                nrc_dict[nrc]['HORAS_TOTALES'] += (days * blocks_per_day)
+                
+            subjects = list(nrc_dict.values())
             
             t['asignaturas'] = subjects
-            t['total_horas'] = sum(s['HORAS_TOTALES'] or 0 for s in subjects if s['TIPO_HORARIO'] != 'APM')
+            t['total_horas'] = sum(s['HORAS_TOTALES'] for s in subjects if s['TIPO_HORARIO'] != 'APM')
             
             # Count unique TEO parent NRCs
             teo_parents = [s for s in subjects if s['TIPO_HORARIO'] == 'TEO' and (s['NRC_PADRE'] is None or s['NRC_PADRE'].strip() == '')]

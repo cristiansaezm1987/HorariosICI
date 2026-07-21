@@ -419,7 +419,7 @@
                         </div>
 
                         <div style="margin-bottom: 25px;">
-                            <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 5px; color: var(--text-primary);">Nivel / Grupo a Importar</label>
+                            <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 5px; color: var(--text-primary);">Nivel / SubSección a Importar</label>
                             <select id="overlay-nivel" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px;" disabled>
                                 <option value="">-- Seleccionar Carrera Primero --</option>
                             </select>
@@ -435,6 +435,25 @@
                         <div style="display: flex; justify-content: flex-end; gap: 10px;">
                             <button id="btn-cancel-overlay" style="padding: 8px 15px; border: 1px solid var(--border-color); background: white; border-radius: 4px; cursor: pointer;">Cancelar</button>
                             <button id="btn-confirm-overlay" style="padding: 8px 15px; border: none; background: var(--primary-color); color: white; border-radius: 4px; cursor: pointer;" disabled>Importar y Ver</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Export Niveles Modal -->
+                <div id="export-niveles-modal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center;">
+                    <div class="modal-content" style="background-color: white; padding: 30px; border-radius: 8px; width: 400px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+                        <h3 style="margin-top: 0; color: var(--primary-color);"><i class="fa-solid fa-file-pdf"></i> Exportar Niveles</h3>
+                        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 20px;">Selecciona los niveles y subsecciones que deseas incluir en el archivo PDF.</p>
+                        
+                        <div id="export-niveles-container" style="margin-bottom: 25px; max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px; padding: 10px; background: #f8fafc;">
+                            <div id="export-niveles-list" style="display: flex; flex-direction: column; gap: 5px; font-size: 0.9rem;">
+                                <!-- Checkboxes will be injected here -->
+                            </div>
+                        </div>
+
+                        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                            <button id="btn-cancel-export-niveles" style="padding: 8px 15px; border: 1px solid var(--border-color); background: white; border-radius: 4px; cursor: pointer;">Cancelar</button>
+                            <button id="btn-confirm-export-niveles" style="padding: 8px 15px; border: none; background: var(--secondary-color); color: white; border-radius: 4px; cursor: pointer;">Generar PDF Seleccionados</button>
                         </div>
                     </div>
                 </div>

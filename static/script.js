@@ -315,7 +315,7 @@ function setupEventListeners() {
                                 sectionsForLevel.forEach(ns => {
                                     const opt = document.createElement('option');
                                     opt.value = `${n}|${ns.seccion}`;
-                                    opt.innerHTML = `&nbsp;&nbsp;&nbsp;↳ Nivel ${n} - Grupo ${ns.seccion}`;
+                                    opt.innerHTML = `&nbsp;&nbsp;&nbsp;↳ Nivel ${n} - SubSección ${ns.seccion}`;
                                     overlayNivelSelect.appendChild(opt);
                                 });
                             }
@@ -480,7 +480,16 @@ function setupEventListeners() {
     toggleDisplayOption('chk-show-tipo', 'hide-tipo');
 
     // EXPORT ALL NIVELES PDF
-    document.getElementById('btn-pdf-all-niveles')?.addEventListener('click', exportAllNivelesPDF);
+    document.getElementById('btn-pdf-all-niveles')?.addEventListener('click', openExportNivelesModal);
+
+    document.getElementById('btn-cancel-export-niveles')?.addEventListener('click', () => {
+        document.getElementById('export-niveles-modal').style.display = 'none';
+    });
+
+    document.getElementById('btn-confirm-export-niveles')?.addEventListener('click', () => {
+        document.getElementById('export-niveles-modal').style.display = 'none';
+        exportAllNivelesPDF();
+    });
 }
 
 // --- FILE UPLOAD LOGIC ---
@@ -632,7 +641,7 @@ function loadGlobalFilters() {
                             sectionsForLevel.forEach(ns => {
                                 const opt = document.createElement('option');
                                 opt.value = `${n}|${ns.seccion}`;
-                                opt.innerHTML = `&nbsp;&nbsp;&nbsp;↳ Nivel ${n} - Grupo ${ns.seccion}`;
+                                opt.innerHTML = `&nbsp;&nbsp;&nbsp;↳ Nivel ${n} - SubSección ${ns.seccion}`;
                                 selectNivel.appendChild(opt);
                             });
                         }
@@ -1122,10 +1131,10 @@ function loadNivelSchedule(nivelStr) {
         const [nivel, seccion] = nivelStr.split('|');
         url.searchParams.append('nivel', nivel);
         url.searchParams.append('seccion', seccion);
-        displayTitle = `Horario Nivel ${nivel} - Grupo ${seccion}`;
+        displayTitle = `Horario Nivel ${nivel} - SECCIÓN ${seccion}`;
     } else {
         url.searchParams.append('nivel', nivelStr);
-        displayTitle = `Horario Nivel ${nivelStr} (Todos los Grupos)`;
+        displayTitle = `Horario Nivel ${nivelStr} (Todas las SubSecciones)`;
     }
     
     if (globalFilters.carrera) url.searchParams.append('carrera', globalFilters.carrera);
@@ -1350,7 +1359,7 @@ function renderTimetable(containerId, scheduleData, viewType) {
                     const tipoText = m.TIPO_HORARIO || 'TEO';
                     let badgeHtml = '';
                     if (m.subgrupo) {
-                        badgeHtml = `<span class="block-badge-type" style="background-color: var(--text-primary); color: white;">Grupo ${m.subgrupo}</span> `;
+                        badgeHtml = `<span class="block-badge-type" style="background-color: var(--text-primary); color: white;">SubSección ${m.subgrupo}</span> `;
                     }
                     if (m.is_overlay) {
                         badgeHtml += `<span class="block-badge-type" style="background-color: var(--secondary-color); color: white;"><i class="fa-solid fa-code-compare"></i> Importado (${m.CARRERA})</span> `;
@@ -1580,14 +1589,44 @@ function exportPDF(type) {
 window.toggleAsignaturaChildren = toggleAsignaturaChildren;
 window.navigateToDocente = navigateToDocente;
 
+// --- EXPORT NIVELES MODAL ---
+function openExportNivelesModal() {
+    const selectNivel = document.getElementById('select-nivel');
+    if (!selectNivel) return;
+    
+    const options = Array.from(selectNivel.options).filter(opt => opt.value !== '');
+    
+    if (options.length === 0) {
+        showToast('No hay niveles disponibles para exportar', 'error');
+        return;
+    }
+    
+    const container = document.getElementById('export-niveles-list');
+    container.innerHTML = '';
+    
+    options.forEach(opt => {
+        const div = document.createElement('div');
+        div.style.marginBottom = '5px';
+        div.innerHTML = `
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                <input type="checkbox" class="export-nivel-cb" value="${opt.value}" checked>
+                <span>${opt.innerHTML.replace(/&nbsp;/g, '').trim()}</span>
+            </label>
+        `;
+        container.appendChild(div);
+    });
+    
+    document.getElementById('export-niveles-modal').style.display = 'flex';
+}
+
 // --- EXPORT ALL NIVELES PDF LOGIC ---
 async function exportAllNivelesPDF() {
     const printContainer = document.getElementById('print-all-niveles');
     printContainer.innerHTML = '';
     
-    // Obtain all possible level values from the dropdown
-    const selectNivel = document.getElementById('select-nivel');
-    const options = Array.from(selectNivel.options).map(opt => opt.value).filter(val => val !== '');
+    // Obtain selected levels from the modal checkboxes
+    const checkboxes = document.querySelectorAll('.export-nivel-cb:checked');
+    const options = Array.from(checkboxes).map(cb => cb.value);
     
     if (options.length === 0) {
         showToast('No hay niveles disponibles para exportar', 'error');
@@ -1601,13 +1640,13 @@ async function exportAllNivelesPDF() {
         
         let n = nivelVal;
         let s = '';
-        let displayTitle = `Nivel ${nivelVal} (Todos los Grupos)`;
+        let displayTitle = `Nivel ${nivelVal} (Todas las SubSecciones)`;
         
         if (nivelVal.includes('|')) {
             [n, s] = nivelVal.split('|');
             url.searchParams.append('nivel', n);
             url.searchParams.append('seccion', s);
-            displayTitle = `Nivel ${n} - Grupo ${s}`;
+            displayTitle = `Nivel ${n} - SECCIÓN ${s}`;
         } else {
             url.searchParams.append('nivel', n);
         }
