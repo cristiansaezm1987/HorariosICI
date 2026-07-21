@@ -1081,7 +1081,7 @@ def get_documentos():
     documentos = []
     for root, dirs, files in os.walk(DOCUMENTOS_DIR):
         for file in files:
-            if file.lower().endswith('.pdf'):
+            if file.lower().endswith(('.pdf', '.docx', '.doc')):
                 rel_path = os.path.relpath(os.path.join(root, file), DOCUMENTOS_DIR)
                 
                 documentos.append({
