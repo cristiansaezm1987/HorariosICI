@@ -1581,6 +1581,17 @@ async function exportAllNivelesPDF() {
         if (globalFilters.carrera) url.searchParams.append('carrera', globalFilters.carrera);
         if (globalFilters.jornada) url.searchParams.append('jornada', globalFilters.jornada);
         
+        if (overlayState.active && overlayState.nivel === n && (!overlayState.seccion || overlayState.seccion === s)) {
+            url.searchParams.append('overlay_carrera', overlayState.carrera);
+            url.searchParams.append('overlay_nivel', overlayState.nivel);
+            if (overlayState.seccion) {
+                url.searchParams.append('overlay_seccion', overlayState.seccion);
+            }
+            if (overlayState.exclude && overlayState.exclude.length > 0) {
+                url.searchParams.append('overlay_exclude', overlayState.exclude.join('|'));
+            }
+        }
+        
         try {
             const res = await fetch(url);
             const data = await res.json();
