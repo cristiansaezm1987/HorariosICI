@@ -2363,8 +2363,8 @@ async function sendTodoEmail(docente) {
         
         // 2. Programas
         const card = document.getElementById('docente-programas-card');
-        if (card.style.display !== 'none' && currentMatchedProgramas && currentMatchedProgramas.length > 0) {
-            const progPromises = currentMatchedProgramas.map(async p => {
+        if (card.style.display !== 'none' && currentDocenteProgramas && currentDocenteProgramas.length > 0) {
+            const progPromises = currentDocenteProgramas.map(async p => {
                 const url = `/api/programas/download?path=${encodeURIComponent(p.path)}`;
                 const res = await fetch(url);
                 if (!res.ok) throw new Error(`Failed to fetch ${p.filename}`);
