@@ -205,14 +205,17 @@ def get_malla_id_by_name(asignatura_name):
     parts = asignatura_name.split('-', 1)
     name = parts[1].strip().upper() if len(parts) > 1 else asignatura_name.strip().upper()
     
+    name_norm = normalize_text(name)
+    
     # Exact match first
     for id, data in MALLA_DATA.items():
-        if data['nombre'] == name:
+        if normalize_text(data['nombre']) == name_norm:
             return id
             
     # Fallback to substring
     for id, data in MALLA_DATA.items():
-        if name in data['nombre'] or data['nombre'] in name:
+        data_norm = normalize_text(data['nombre'])
+        if name_norm in data_norm or data_norm in name_norm:
             return id
             
     return None
@@ -1234,33 +1237,37 @@ def get_nrc_info(cursor, nrcs):
         WHERE NRC IN ({placeholders})
     """, nrcs)
     
-    results = []
+    results_dict = {}
     for row in cursor.fetchall():
+        nrc = row['NRC']
         id_malla = get_malla_id_by_name(row['TITULO'])
         malla_info = MALLA_DATA.get(id_malla) if id_malla else None
-        
-        # Parse schedule
-        schedule = []
-        days = [('LUNES', row['LUNES']), ('MARTES', row['MARTES']), ('MIERCOLES', row['MIERCOLES']), 
-                ('JUEVES', row['JUEVES']), ('VIERNES', row['VIERNES']), ('SABADO', row['SABADO']), ('DOMINGO', row['DOMINGO'])]
         
         hi = int(str(row['HORA_INCIO']).replace(':', '')) if row['HORA_INCIO'] else 0
         hf = int(str(row['HORA_FIN']).replace(':', '')) if row['HORA_FIN'] else 0
         
-        for day_name, val in days:
-            if val:
-                schedule.append({'day': day_name, 'start': hi, 'end': hf})
+        days = [('LUNES', row['LUNES']), ('MARTES', row['MARTES']), ('MIERCOLES', row['MIERCOLES']), 
+                ('JUEVES', row['JUEVES']), ('VIERNES', row['VIERNES']), ('SABADO', row['SABADO']), ('DOMINGO', row['DOMINGO'])]
                 
-        results.append({
-            'nrc': row['NRC'],
-            'titulo': row['TITULO'],
-            'id_malla': id_malla,
-            'sct': malla_info['sct'] if malla_info else 0,
-            'nivel': malla_info['nivel'] if malla_info else 99,
-            'requisitos': malla_info['requisitos'] if malla_info else [],
-            'schedule': schedule
-        })
-    return results
+        schedule_entries = []
+        for day_name, val in days:
+            if val == 'Y':
+                schedule_entries.append({'day': day_name, 'start': hi, 'end': hf})
+                
+        if nrc not in results_dict:
+            results_dict[nrc] = {
+                'nrc': nrc,
+                'titulo': row['TITULO'],
+                'id_malla': id_malla,
+                'sct': malla_info['sct'] if malla_info else 0,
+                'nivel': malla_info['nivel'] if malla_info else 99,
+                'requisitos': malla_info['requisitos'] if malla_info else [],
+                'schedule': []
+            }
+        
+        results_dict[nrc]['schedule'].extend(schedule_entries)
+        
+    return list(results_dict.values())
 
 def check_schedule_conflict(sched1, sched2):
     for s1 in sched1:
@@ -1367,11 +1374,11 @@ def validar_toma_carga():
     
     for ni in new_info:
         # Rule 5: Already Approved
-        if historial.get(ni['id_malla'], {}).get('aprobado', False):
+        if ni['id_malla'] and historial.get(ni['id_malla'], {}).get('aprobado', False):
             errors.append(f"Regla 5 Falló: {ni['titulo']} ya se encuentra aprobada en el historial del estudiante.")
             
         # Rule 6: Already Enrolled
-        if any(x['id_malla'] == ni['id_malla'] for x in enrolled_info):
+        if ni['id_malla'] and any((x['id_malla'] == ni['id_malla']) for x in enrolled_info):
             errors.append(f"Regla 6 Falló: {ni['titulo']} ya está inscrita en el periodo actual.")
             
         # Rule 3: Max Levels (+3 from nivel_base)
