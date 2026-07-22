@@ -2642,6 +2642,101 @@ document.getElementById('tc-nrc')?.addEventListener('change', (e) => {
     document.getElementById('tc-tipo').value = selectedOpt ? (selectedOpt.dataset.tipo || '') : '';
 });
 
+document.getElementById('btn-recomendar-ramos')?.addEventListener('click', async () => {
+    const rut = document.getElementById('tc-rut').value;
+    const token = document.getElementById('tc-smp-token').value;
+    const btn = document.getElementById('btn-recomendar-ramos');
+    
+    if (!rut || !token) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Faltan Datos',
+            text: 'Por favor, ingrese el RUT del estudiante y el Token de Autorización SMP.'
+        });
+        return;
+    }
+    
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Calculando...';
+    btn.disabled = true;
+    
+    try {
+        const res = await fetch('/api/toma_carga/posibles', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rut, smp_token: token })
+        });
+        
+        const result = await res.json();
+        if (!result.success) {
+            Swal.fire('Error', result.message || 'Error al obtener recomendaciones', 'error');
+            return;
+        }
+        
+        if (result.posibles.length === 0) {
+            Swal.fire({
+                icon: 'info',
+                title: 'Sin Opciones',
+                text: 'El estudiante no tiene asignaturas disponibles para inscribir (por topes de horario, SCT, niveles o pre-requisitos).'
+            });
+            return;
+        }
+        
+        let html = `<div style="text-align: left; font-size: 0.9rem;">
+            <div style="margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                <strong>Nivel Base:</strong> ${result.nivel_base}<br>
+                <strong>SCT Actuales:</strong> ${result.sct_actual} / 32
+            </div>
+            <p style="margin-bottom: 10px;"><b>Asignaturas Recomendadas:</b></p>
+            <div style="max-height: 350px; overflow-y: auto;">`;
+            
+        result.posibles.forEach(r => {
+            html += `<div style="background: white; border: 1px solid #cbd5e1; padding: 10px; margin-bottom: 8px; border-radius: 6px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--primary-color)'" onmouseout="this.style.borderColor='#cbd5e1'" onclick="
+                const asigSelect = document.getElementById('tc-asignatura');
+                for (let i=0; i<asigSelect.options.length; i++) {
+                    if (asigSelect.options[i].text.includes('${r.titulo.replace("'", "\\'")}')) {
+                        asigSelect.selectedIndex = i;
+                        asigSelect.dispatchEvent(new Event('change'));
+                        Swal.close();
+                        setTimeout(() => {
+                            const nrcSelect = document.getElementById('tc-nrc');
+                            for (let j=0; j<nrcSelect.options.length; j++) {
+                                if (nrcSelect.options[j].value === '${r.nrcs.join(', ')}') {
+                                    nrcSelect.selectedIndex = j;
+                                    nrcSelect.dispatchEvent(new Event('change'));
+                                    break;
+                                }
+                            }
+                        }, 200);
+                        break;
+                    }
+                }
+            ">
+                <div style="font-weight: 600; color: var(--primary-color);">${r.titulo}</div>
+                <div style="font-size: 0.85rem; color: #64748b; margin-top: 4px;">
+                    Nivel: ${r.nivel} | SCT: ${r.sct} | NRCs: ${r.nrcs.join(', ')}
+                </div>
+            </div>`;
+        });
+        
+        html += `</div></div>`;
+        
+        Swal.fire({
+            title: 'Ramos Posibles',
+            html: html,
+            width: '600px',
+            showConfirmButton: false,
+            showCloseButton: true
+        });
+        
+    } catch (error) {
+        console.error(error);
+        Swal.fire('Error', 'Ocurrió un error al procesar la solicitud.', 'error');
+    } finally {
+        btn.innerHTML = '<i class="fa-solid fa-magic"></i> Recomendar Ramos';
+        btn.disabled = false;
+    }
+});
+
 document.getElementById('toma-carga-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const data = {

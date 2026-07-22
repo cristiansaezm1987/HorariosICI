@@ -1408,6 +1408,146 @@ def validar_toma_carga():
         
     return jsonify({'success': True, 'message': 'Validación exitosa.'})
 
+@app.route('/api/toma_carga/posibles', methods=['POST'])
+def posibles_toma_carga():
+    data = request.json
+    rut = data.get('rut')
+    token = data.get('smp_token')
+    
+    if not rut or not token:
+        return jsonify({'success': False, 'message': 'Faltan datos obligatorios (RUT o Token).'}), 400
+        
+    token_clean = token.strip()
+    if token_clean.startswith('Bearer '):
+        token_clean = token_clean[7:].strip()
+    if 'Bearer ' in token_clean:
+        token_clean = token_clean.split('Bearer ')[1].split("'")[0].split('"')[0].strip()
+        
+    rut_clean = rut.split('-')[0].replace('.', '')
+    
+    url = f"https://apismp.uautonoma.cl/estudiantes/malla?pagina=0&registros=1000000&id={rut_clean}&programa=ICIND_111"
+    headers = {
+        'Accept': '*/*',
+        'Authorization': f'Bearer {token_clean}',
+        'Origin': 'https://smp.uautonoma.cl',
+        'Referer': 'https://smp.uautonoma.cl/',
+        'api': 'GESTIÓN ACADÉMICA',
+        'aplicativo': 'ESTUDIANTE',
+        'codInstitucion': 'UAC',
+        'endpoint': url,
+        'pidmUsuario': '178360',
+        'tipoPeticion': 'GET'
+    }
+    
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        if r.status_code == 401:
+            return jsonify({'success': False, 'message': 'Token de SMP inválido o expirado. Por favor, actualiza tu Token.'}), 401
+        r.raise_for_status()
+        smp_data = r.json()
+        
+        url_horario = f"https://apismp.uautonoma.cl/estudiantes/horario?pagina=0&registros=1000000&id={rut_clean}&periodo=202620"
+        headers['endpoint'] = url_horario
+        r_horario = requests.get(url_horario, headers=headers, timeout=10)
+        r_horario.raise_for_status()
+        smp_horario = r_horario.json()
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error conectando a SMP: {str(e)}'}), 500
+        
+    historial = parse_malla_api(smp_data)
+    enrolled_nrcs = list(set([row.get('nrc') for row in smp_horario.get('data', []) if row.get('nrc')]))
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    enrolled_info = get_nrc_info(cursor, enrolled_nrcs)
+    
+    # Calculate Nivel Base
+    niveles_aprobados = {}
+    for id_malla, data in MALLA_DATA.items():
+        nivel = data['nivel']
+        if historial.get(id_malla, {}).get('aprobado', False):
+            if nivel not in niveles_aprobados:
+                niveles_aprobados[nivel] = {'total': 0, 'aprobadas': 0}
+            niveles_aprobados[nivel]['aprobadas'] += 1
+            
+        if nivel not in niveles_aprobados:
+            niveles_aprobados[nivel] = {'total': 0, 'aprobadas': 0}
+        niveles_aprobados[nivel]['total'] += 1
+        
+    nivel_base = 0
+    for nivel in sorted(niveles_aprobados.keys()):
+        if niveles_aprobados[nivel]['aprobadas'] == niveles_aprobados[nivel]['total'] and niveles_aprobados[nivel]['total'] > 0:
+            nivel_base = nivel
+        else:
+            break
+            
+    sct_actual = sum(x['sct'] for x in enrolled_info)
+    all_schedules = [sched for x in enrolled_info for sched in x['schedule']]
+    
+    # Get all distinct NRCs from database
+    cursor.execute("SELECT DISTINCT NRC FROM planificacion")
+    all_nrcs_in_db = [row['NRC'] for row in cursor.fetchall()]
+    all_nrcs_info = get_nrc_info(cursor, all_nrcs_in_db)
+    
+    conn.close()
+    
+    posibles = []
+    
+    for ni in all_nrcs_info:
+        # Rule 5: Already Approved
+        if ni['id_malla'] and historial.get(ni['id_malla'], {}).get('aprobado', False):
+            continue
+            
+        # Rule 6: Already Enrolled
+        if ni['id_malla'] and any((x['id_malla'] == ni['id_malla']) for x in enrolled_info):
+            continue
+            
+        # Rule 3: Max Levels (+3 from nivel_base)
+        if ni['nivel'] > (nivel_base + 3):
+            continue
+            
+        # Rule 4: Prerequisites
+        missing_prereqs = False
+        if ni['requisitos']:
+            for req_id in ni['requisitos']:
+                if not historial.get(req_id, {}).get('aprobado', False):
+                    missing_prereqs = True
+                    break
+        if missing_prereqs:
+            continue
+            
+        # Rule 1: Max 32 SCT
+        if (sct_actual + ni['sct']) > 32:
+            continue
+            
+        # Rule 2: Schedule Conflict
+        conflict = False
+        for sched in all_schedules:
+            if check_schedule_conflict(ni['schedule'], sched):
+                conflict = True
+                break
+                
+        if conflict:
+            continue
+            
+        # Passed all checks!
+        posibles.append({
+            'titulo': ni['titulo'],
+            'nrc': ni['nrc'],
+            'sct': ni['sct'],
+            'nivel': ni['nivel']
+        })
+        
+    # Group by titulo
+    agrupados = {}
+    for p in posibles:
+        if p['titulo'] not in agrupados:
+            agrupados[p['titulo']] = {'titulo': p['titulo'], 'nivel': p['nivel'], 'sct': p['sct'], 'nrcs': []}
+        agrupados[p['titulo']]['nrcs'].append(p['nrc'])
+        
+    resultados_finales = sorted(list(agrupados.values()), key=lambda x: x['nivel'])
+    
+    return jsonify({'success': True, 'posibles': resultados_finales, 'nivel_base': nivel_base, 'sct_actual': sct_actual})
 @app.route('/api/toma_carga/asignaturas', methods=['GET'])
 def get_toma_carga_asignaturas():
     carrera = request.args.get('carrera', '')
