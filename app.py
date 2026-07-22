@@ -161,6 +161,21 @@ def init_db():
     # Create main table
     columns_sql = ", ".join(COLUMN_MAPPING.values())
     cursor.execute(f"CREATE TABLE IF NOT EXISTS planificacion (id INTEGER PRIMARY KEY AUTOINCREMENT, {columns_sql})")
+    
+    # Create toma_carga_manual table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS toma_carga_manual (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            rut TEXT,
+            nombre TEXT,
+            asignatura TEXT,
+            nrc TEXT,
+            tipo TEXT,
+            comentarios TEXT,
+            fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    
     conn.commit()
     conn.close()
 
@@ -1109,6 +1124,123 @@ def download_programa():
     file_name = os.path.basename(safe_path)
     
     return send_from_directory(dir_name, file_name, as_attachment=True)
+
+# ==========================================
+# TOMA DE CARGA (MANUAL REGISTRATION)
+# ==========================================
+ALUMNOS_CSV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'alumnos', 'Matrícula Total 202620.csv')
+_alumnos_cache = None
+
+def get_alumnos_data():
+    global _alumnos_cache
+    if _alumnos_cache is None:
+        _alumnos_cache = []
+        if os.path.exists(ALUMNOS_CSV_PATH):
+            with open(ALUMNOS_CSV_PATH, 'r', encoding='latin-1') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    _alumnos_cache.append(row)
+    return _alumnos_cache
+
+@app.route('/api/alumnos/search', methods=['GET'])
+def search_alumnos():
+    rut_query = request.args.get('rut', '').strip().lower()
+    if not rut_query:
+        return jsonify([])
+    
+    alumnos = get_alumnos_data()
+    results = []
+    # ID_BANNER is the rut
+    for a in alumnos:
+        if rut_query in str(a.get('ID_BANNER', '')).lower():
+            results.append({
+                'rut': a.get('ID_BANNER', ''),
+                'nombre': f"{a.get('NOMBRES', '')} {a.get('APELLIDOS', '')}".strip()
+            })
+            if len(results) >= 20: # Limit results
+                break
+    return jsonify(results)
+
+@app.route('/api/toma_carga/asignaturas', methods=['GET'])
+def get_toma_carga_asignaturas():
+    try:
+        conn = get_db_connection()
+        cursor = conn.execute('''
+            SELECT DISTINCT MATERIA, CURSO, TITULO
+            FROM planificacion
+            ORDER BY TITULO
+        ''')
+        rows = cursor.fetchall()
+        
+        cursor_nrcs = conn.execute('''
+            SELECT MATERIA, CURSO, TITULO, NRC, NRC_PADRE, TIPO_REUNION
+            FROM planificacion
+        ''')
+        nrcs = [dict(row) for row in cursor_nrcs.fetchall()]
+        conn.close()
+        
+        asignaturas = []
+        for r in rows:
+            asignaturas.append({
+                'materia': r['MATERIA'],
+                'curso': r['CURSO'],
+                'titulo': r['TITULO'],
+                'label': f"{r['MATERIA']} {r['CURSO']} - {r['TITULO']}"
+            })
+            
+        return jsonify({
+            'asignaturas': asignaturas,
+            'nrcs': nrcs
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/toma_carga', methods=['GET', 'POST'])
+def handle_toma_carga():
+    if request.method == 'GET':
+        try:
+            conn = get_db_connection()
+            cursor = conn.execute('SELECT * FROM toma_carga_manual ORDER BY id DESC')
+            rows = [dict(r) for r in cursor.fetchall()]
+            conn.close()
+            return jsonify(rows)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
+    elif request.method == 'POST':
+        data = request.json
+        if not data or not data.get('rut'):
+            return jsonify({'success': False, 'message': 'RUT requerido'}), 400
+            
+        try:
+            conn = get_db_connection()
+            conn.execute('''
+                INSERT INTO toma_carga_manual (rut, nombre, asignatura, nrc, tipo, comentarios)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                data.get('rut', ''),
+                data.get('nombre', ''),
+                data.get('asignatura', ''),
+                data.get('nrc', ''),
+                data.get('tipo', ''),
+                data.get('comentarios', '')
+            ))
+            conn.commit()
+            conn.close()
+            return jsonify({'success': True})
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
+            
+@app.route('/api/toma_carga/<int:record_id>', methods=['DELETE'])
+def delete_toma_carga(record_id):
+    try:
+        conn = get_db_connection()
+        conn.execute('DELETE FROM toma_carga_manual WHERE id = ?', (record_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 if __name__ == '__main__':
     # Ensure database is initialized

@@ -74,6 +74,9 @@
                 <button class="nav-item" data-tab="documentos">
                     <i class="fa-solid fa-folder-open"></i> Repositorio Documentos
                 </button>
+                <button class="nav-item" data-tab="toma-carga">
+                    <i class="fa-solid fa-user-plus"></i> Toma de Carga
+                </button>
             </nav>
 
             <!-- File Upload Section -->
@@ -629,6 +632,88 @@
                         <div style="grid-column: 1 / -1; text-align: center; color: #64748b; padding: 40px;">
                             <i class="fa-solid fa-circle-notch fa-spin"></i> Cargando documentos...
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tab: Toma de Carga -->
+            <section id="tab-toma-carga" class="tab-content">
+                <div class="card" style="margin-bottom: 20px;">
+                    <h2><i class="fa-solid fa-user-plus"></i> Toma de Carga (Inscripción Manual)</h2>
+                    <p style="color: var(--text-light); margin-bottom: 20px;">Formulario para inscripción manual de estudiantes con problemas en la toma de carga oficial.</p>
+                    
+                    <form id="toma-carga-form" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div class="filter-group">
+                            <label for="tc-rut">RUT Estudiante (Sin guión ni puntos, ej: 199976591)</label>
+                            <input type="text" id="tc-rut" placeholder="Escriba el RUT para autocompletar..." required autocomplete="off" style="padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; width: 100%;">
+                            <div id="tc-rut-results" style="position: absolute; background: white; border: 1px solid var(--border-color); width: calc(100% - 30px); max-height: 200px; overflow-y: auto; display: none; z-index: 100; border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="tc-nombre">Nombre Estudiante</label>
+                            <input type="text" id="tc-nombre" readonly required style="padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; width: 100%; background: #f8fafc; color: #64748b;">
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="tc-asignatura">Materia, Curso, Nombre Asignatura</label>
+                            <select id="tc-asignatura" required style="padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; width: 100%;">
+                                <option value="">Seleccione o busque una asignatura...</option>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="tc-nrc">NRC</label>
+                            <select id="tc-nrc" required style="padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; width: 100%;">
+                                <option value="">Seleccione NRC...</option>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="tc-tipo">Asignatura Tipo</label>
+                            <input type="text" id="tc-tipo" readonly required style="padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; width: 100%; background: #f8fafc; color: #64748b;">
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="tc-comentarios">Comentarios (Opcional)</label>
+                            <input type="text" id="tc-comentarios" placeholder="Observaciones adicionales..." style="padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; width: 100%;">
+                        </div>
+                        
+                        <div style="grid-column: 1 / -1; display: flex; justify-content: flex-end; margin-top: 10px;">
+                            <button type="submit" class="btn-primary" id="btn-save-tc">
+                                <i class="fa-solid fa-save"></i> Registrar Inscripción
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3>Lista de Inscripciones Manuales</h3>
+                        <button class="btn-secondary" id="btn-export-tc" style="background: var(--success-color); color: white; border: none;">
+                            <i class="fa-solid fa-file-excel"></i> Exportar a Excel
+                        </button>
+                    </div>
+                    
+                    <div style="overflow-x: auto;">
+                        <table class="schedule-table" id="tc-table">
+                            <thead>
+                                <tr>
+                                    <th>RUT</th>
+                                    <th>Nombre</th>
+                                    <th>Asignatura</th>
+                                    <th>NRC</th>
+                                    <th>Tipo</th>
+                                    <th>Comentarios</th>
+                                    <th>Fecha</th>
+                                    <th>Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tc-tbody">
+                                <tr>
+                                    <td colspan="8" style="text-align: center; color: var(--text-light);">Cargando registros...</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </section>

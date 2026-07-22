@@ -655,6 +655,10 @@ function switchTab(tabName) {
         }
     } else if (tabName === 'salas') {
         loadSalas();
+    } else if (tabName === 'toma-carga') {
+        if (tcAsignaturas.length === 0) {
+            initTomaCarga();
+        }
     }
 }
 
@@ -2472,4 +2476,218 @@ document.getElementById('btn-copy-correo')?.addEventListener('click', async () =
             console.error('Failed to copy', err);
         }
     }
+});
+
+
+
+// ==========================================
+// TOMA DE CARGA (MANUAL REGISTRATION)
+// ==========================================
+let tcAsignaturas = [];
+let tcNrcs = [];
+
+async function initTomaCarga() {
+    try {
+        const res = await fetch('/api/toma_carga/asignaturas');
+        const data = await res.json();
+        tcAsignaturas = data.asignaturas || [];
+        tcNrcs = data.nrcs || [];
+        
+        const selectAsig = document.getElementById('tc-asignatura');
+        if(selectAsig) {
+            selectAsig.innerHTML = '<option value="">Seleccione o busque una asignatura...</option>';
+            tcAsignaturas.forEach(a => {
+                const opt = document.createElement('option');
+                opt.value = a.label;
+                opt.textContent = a.label;
+                selectAsig.appendChild(opt);
+            });
+        }
+        
+        loadTomaCargaTable();
+    } catch (err) {
+        console.error("Error loading Toma de Carga data:", err);
+    }
+}
+
+document.getElementById('tc-rut')?.addEventListener('input', async (e) => {
+    const val = e.target.value.trim();
+    const resultsDiv = document.getElementById('tc-rut-results');
+    if (val.length < 3) {
+        resultsDiv.style.display = 'none';
+        return;
+    }
+    
+    try {
+        const res = await fetch(`/api/alumnos/search?rut=${encodeURIComponent(val)}`);
+        const data = await res.json();
+        
+        if (data.length > 0) {
+            resultsDiv.innerHTML = '';
+            data.forEach(al => {
+                const div = document.createElement('div');
+                div.style.padding = '8px 10px';
+                div.style.cursor = 'pointer';
+                div.style.borderBottom = '1px solid #eee';
+                div.textContent = `${al.rut} - ${al.nombre}`;
+                div.addEventListener('mouseenter', () => div.style.background = '#f1f5f9');
+                div.addEventListener('mouseleave', () => div.style.background = 'white');
+                div.addEventListener('click', () => {
+                    document.getElementById('tc-rut').value = al.rut;
+                    document.getElementById('tc-nombre').value = al.nombre;
+                    resultsDiv.style.display = 'none';
+                });
+                resultsDiv.appendChild(div);
+            });
+            resultsDiv.style.display = 'block';
+        } else {
+            resultsDiv.innerHTML = '<div style="padding: 8px 10px; color: #64748b;">No se encontraron resultados</div>';
+            resultsDiv.style.display = 'block';
+        }
+    } catch (err) {
+        console.error(err);
+    }
+});
+
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('#tc-rut') && !e.target.closest('#tc-rut-results')) {
+        const res = document.getElementById('tc-rut-results');
+        if (res) res.style.display = 'none';
+    }
+});
+
+document.getElementById('tc-asignatura')?.addEventListener('change', (e) => {
+    const val = e.target.value;
+    const nrcSelect = document.getElementById('tc-nrc');
+    nrcSelect.innerHTML = '<option value="">Seleccione NRC...</option>';
+    document.getElementById('tc-tipo').value = '';
+    
+    if (!val) return;
+    
+    const asig = tcAsignaturas.find(a => a.label === val);
+    if (!asig) return;
+    
+    const relatedNrcs = tcNrcs.filter(n => n.MATERIA === asig.materia && n.CURSO === asig.curso);
+    relatedNrcs.forEach(n => {
+        const opt = document.createElement('option');
+        opt.value = n.NRC;
+        opt.textContent = `${n.NRC} (${n.TIPO_REUNION})`;
+        opt.dataset.tipo = n.TIPO_REUNION;
+        nrcSelect.appendChild(opt);
+    });
+});
+
+document.getElementById('tc-nrc')?.addEventListener('change', (e) => {
+    const selectedOpt = e.target.options[e.target.selectedIndex];
+    document.getElementById('tc-tipo').value = selectedOpt ? (selectedOpt.dataset.tipo || '') : '';
+});
+
+document.getElementById('toma-carga-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = {
+        rut: document.getElementById('tc-rut').value,
+        nombre: document.getElementById('tc-nombre').value,
+        asignatura: document.getElementById('tc-asignatura').value,
+        nrc: document.getElementById('tc-nrc').value,
+        tipo: document.getElementById('tc-tipo').value,
+        comentarios: document.getElementById('tc-comentarios').value
+    };
+    
+    if (!data.nombre) {
+        showToast('Debe seleccionar un alumno válido de la lista.', 'error');
+        return;
+    }
+    
+    try {
+        const btn = document.getElementById('btn-save-tc');
+        const ogText = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
+        btn.disabled = true;
+        
+        const res = await fetch('/api/toma_carga', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        btn.innerHTML = ogText;
+        btn.disabled = false;
+        
+        if (res.ok) {
+            showToast('Inscripción registrada correctamente', 'success');
+            document.getElementById('toma-carga-form').reset();
+            loadTomaCargaTable();
+        } else {
+            const err = await res.json();
+            showToast(err.message || 'Error al guardar', 'error');
+        }
+    } catch (err) {
+        showToast('Error de conexión', 'error');
+    }
+});
+
+async function loadTomaCargaTable() {
+    const tbody = document.getElementById('tc-tbody');
+    try {
+        const res = await fetch('/api/toma_carga');
+        const rows = await res.json();
+        
+        tbody.innerHTML = '';
+        if (rows.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-light);">No hay inscripciones manuales registradas.</td></tr>';
+            return;
+        }
+        
+        rows.forEach(r => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${r.rut}</td>
+                <td>${r.nombre}</td>
+                <td>${r.asignatura}</td>
+                <td>${r.nrc}</td>
+                <td>${r.tipo}</td>
+                <td>${r.comentarios || ''}</td>
+                <td>${new Date(r.fecha_registro).toLocaleString()}</td>
+                <td>
+                    <button type="button" class="btn-pdf" style="background: #e11d48; padding: 4px 8px; font-size: 0.8rem;" onclick="deleteTomaCarga(${r.id})">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: red;">Error al cargar registros.</td></tr>';
+    }
+}
+
+// Attach globally so HTML button can call it
+window.deleteTomaCarga = async function(id) {
+    if (!confirm('¿Está seguro de eliminar esta inscripción?')) return;
+    try {
+        const res = await fetch(`/api/toma_carga/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+            showToast('Registro eliminado', 'success');
+            loadTomaCargaTable();
+        }
+    } catch (err) {
+        showToast('Error al eliminar', 'error');
+    }
+};
+
+document.getElementById('btn-export-tc')?.addEventListener('click', () => {
+    const table = document.getElementById('tc-table');
+    let csv = [];
+    for (let i = 0; i < table.rows.length; i++) {
+        let row = [], cols = table.rows[i].querySelectorAll('td, th');
+        for (let j = 0; j < cols.length - 1; j++) {
+            row.push('"' + cols[j].innerText.replace(/"/g, '""') + '"');
+        }
+        csv.push(row.join(';'));
+    }
+    const csvFile = new Blob(["\\ufeff" + csv.join('\\n')], {type: "text/csv;charset=utf-8;"});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(csvFile);
+    a.download = `Toma_de_Carga_Manual_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
 });
