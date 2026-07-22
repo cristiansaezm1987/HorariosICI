@@ -1540,7 +1540,8 @@ def posibles_toma_carga():
             'titulo': ni['titulo'],
             'nrc': ni['nrc'],
             'sct': ni['sct'],
-            'nivel': ni['nivel']
+            'nivel': ni['nivel'],
+            'id_malla': ni['id_malla']
         })
         
     # Group by titulo
@@ -1552,7 +1553,38 @@ def posibles_toma_carga():
         
     resultados_finales = sorted(list(agrupados.values()), key=lambda x: x['nivel'])
     
-    return jsonify({'success': True, 'posibles': resultados_finales, 'nivel_base': nivel_base, 'sct_actual': sct_actual})
+    # --- Generate Malla Visual Data ---
+    malla_visual = {}
+    enrolled_malla_ids = set([x['id_malla'] for x in enrolled_info if x['id_malla']])
+    sugeridos_malla_ids = set([p['id_malla'] for p in posibles if p['id_malla']])
+    
+    for id_malla, data in MALLA_DATA.items():
+        nivel = data['nivel']
+        if nivel not in malla_visual:
+            malla_visual[nivel] = []
+            
+        estado = 'pendiente'
+        if historial.get(id_malla, {}).get('aprobado', False):
+            estado = 'aprobado'
+        elif id_malla in enrolled_malla_ids:
+            estado = 'tomado'
+        elif id_malla in sugeridos_malla_ids:
+            estado = 'sugerido'
+            
+        malla_visual[nivel].append({
+            'id_malla': id_malla,
+            'nombre': data['nombre'],
+            'sct': data['sct'],
+            'estado': estado
+        })
+        
+    return jsonify({
+        'success': True, 
+        'posibles': resultados_finales, 
+        'nivel_base': nivel_base, 
+        'sct_actual': sct_actual,
+        'malla_visual': dict(sorted(malla_visual.items()))
+    })
 @app.route('/api/toma_carga/asignaturas', methods=['GET'])
 def get_toma_carga_asignaturas():
     carrera = request.args.get('carrera', '')

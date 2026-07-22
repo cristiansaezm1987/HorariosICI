@@ -75,7 +75,10 @@
                     <i class="fa-solid fa-folder-open"></i> Repositorio Documentos
                 </button>
                 <button class="nav-item" data-tab="toma-carga">
-                    <i class="fa-solid fa-user-plus"></i> Toma de Carga
+                    <i class="fa-solid fa-list-check"></i> Toma de Carga
+                </button>
+                <button class="nav-item" data-tab="malla-visual">
+                    <i class="fa-solid fa-sitemap"></i> Malla Visual
                 </button>
             </nav>
 
@@ -727,7 +730,46 @@
                 </div>
             </section>
 
-        </main>
+            <!-- TAB: Malla Visual -->
+        <div class="tab-pane" id="malla-visual">
+            <div class="header-actions">
+                <h2><i class="fa-solid fa-sitemap"></i> Malla Visual del Estudiante</h2>
+            </div>
+            
+            <div class="card" style="margin-bottom: 20px;">
+                <div style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 250px;">
+                        <label for="mv-rut" style="display:block; margin-bottom:5px; font-weight: 500;">RUT del Estudiante</label>
+                        <input type="text" id="mv-rut" placeholder="Ej: 12345678-9" style="padding: 10px; width: 100%; border: 1px solid var(--border-color); border-radius: 4px;">
+                    </div>
+                    <div style="flex: 1; min-width: 250px;">
+                        <label for="mv-token" style="display:block; margin-bottom:5px; font-weight: 500;">Token SMP</label>
+                        <input type="password" id="mv-token" placeholder="Bearer eyJhb..." style="padding: 10px; width: 100%; border: 1px solid var(--border-color); border-radius: 4px;">
+                    </div>
+                    <div>
+                        <button type="button" class="btn-primary" id="btn-load-malla" style="padding: 10px 20px;">
+                            <i class="fa-solid fa-sync"></i> Cargar Malla
+                        </button>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 15px; margin-top: 15px; font-size: 0.9rem;">
+                    <div style="display: flex; align-items: center; gap: 5px;"><span style="display:inline-block; width:15px; height:15px; background: #dcfce7; border: 1px solid #22c55e; border-radius: 3px;"></span> Aprobada</div>
+                    <div style="display: flex; align-items: center; gap: 5px;"><span style="display:inline-block; width:15px; height:15px; background: #dbeafe; border: 1px solid #3b82f6; border-radius: 3px;"></span> Tomada / Cursando</div>
+                    <div style="display: flex; align-items: center; gap: 5px;"><span style="display:inline-block; width:15px; height:15px; background: #fef9c3; border: 1px solid #eab308; border-radius: 3px;"></span> Sugerida (Puede tomar)</div>
+                    <div style="display: flex; align-items: center; gap: 5px;"><span style="display:inline-block; width:15px; height:15px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 3px;"></span> Pendiente / Bloqueada</div>
+                </div>
+            </div>
+            
+            <div id="malla-container" style="display: flex; gap: 20px; overflow-x: auto; padding-bottom: 20px; min-height: 400px;">
+                <!-- Malla will be rendered here -->
+                <div style="width: 100%; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 1.1rem;">
+                    Ingrese el RUT y Token para cargar la malla académica...
+                </div>
+            </div>
+        </div>
+
+    </main>
     </div>
 
     <div id="print-all-niveles" style="display: none;"></div>

@@ -2995,6 +2995,201 @@ document.getElementById('btn-export-tc')?.addEventListener('click', () => {
         for (let k = 0; k < nrcs.length; k++) {
             let row = [
                 '"' + rut.replace(/"/g, '""') + '"',
+        });
+        
+    } catch (error) {
+        console.error(error);
+        Swal.fire('Error', 'Ocurrió un error al procesar la solicitud.', 'error');
+    } finally {
+        btn.innerHTML = '<i class="fa-solid fa-magic"></i> Recomendar Ramos';
+        btn.disabled = false;
+    }
+});
+
+document.getElementById('toma-carga-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = {
+        rut: document.getElementById('tc-rut').value,
+        nombre: document.getElementById('tc-nombre').value,
+        asignatura: document.getElementById('tc-asignatura').value,
+        nrc: document.getElementById('tc-nrc').value,
+        tipo: document.getElementById('tc-tipo').value,
+        comentarios: document.getElementById('tc-comentarios').value
+    };
+    
+    const token = document.getElementById('tc-smp-token').value;
+    
+    if (!data.nombre) {
+        showToast('Debe seleccionar un alumno válido de la lista.', 'error');
+        return;
+    }
+    
+    try {
+        const btn = document.getElementById('btn-save-tc');
+        const ogText = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Validando...';
+        btn.disabled = true;
+        
+        // Split NRCs if there are multiple (e.g., theory + lab)
+        const nrcsList = data.nrc.split(',').map(n => n.trim()).filter(n => n);
+        
+        // 1. Validate rules via API
+        const validRes = await fetch('/api/toma_carga/validar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                rut: data.rut,
+                nrcs: nrcsList,
+                smp_token: token
+            })
+        });
+        
+        if (validRes.status === 401) {
+            btn.innerHTML = ogText;
+            btn.disabled = false;
+            Swal.fire({
+                icon: 'error',
+                title: 'Token Inválido',
+                text: 'El Token de SMP ha expirado o es incorrecto. Por favor vuelve a iniciar sesión en SMP y copia un nuevo token.'
+            });
+            return;
+        }
+        
+        const validData = await validRes.json();
+        
+        if (!validData.success) {
+            btn.innerHTML = ogText;
+            btn.disabled = false;
+            
+            // Build error list
+            const errorListHtml = '<ul style="text-align: left; font-size: 0.9rem;">' + 
+                (validData.errors || [validData.message]).map(e => `<li style="margin-bottom:5px;">${e}</li>`).join('') + 
+                '</ul>';
+                
+            Swal.fire({
+                icon: 'warning',
+                title: 'Inscripción Rechazada',
+                html: `<p>El estudiante no cumple con las reglas de inscripción:</p>${errorListHtml}`,
+                confirmButtonColor: '#f59e0b'
+            });
+            return;
+        }
+        
+        // 2. Save the inscription if validation passed
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
+        const res = await fetch('/api/toma_carga', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        btn.innerHTML = ogText;
+        btn.disabled = false;
+        
+        if (res.ok) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Inscripción Registrada',
+                text: 'El estudiante cumple con todos los requisitos y se ha registrado correctamente.',
+                timer: 3000,
+                showConfirmButton: false
+            });
+            // Don't clear token on reset, so user can keep typing
+            const currentToken = document.getElementById('tc-smp-token').value;
+            document.getElementById('toma-carga-form').reset();
+            document.getElementById('tc-smp-token').value = currentToken;
+            loadTomaCargaTable();
+        } else {
+            const err = await res.json();
+            showToast(err.message || 'Error al guardar', 'error');
+        }
+    } catch (err) {
+        showToast('Error de conexión', 'error');
+        document.getElementById('btn-save-tc').innerHTML = '<i class="fa-solid fa-save"></i> Registrar Inscripción';
+        document.getElementById('btn-save-tc').disabled = false;
+    }
+});
+
+async function loadTomaCargaTable() {
+    const tbody = document.getElementById('tc-tbody');
+    try {
+        const res = await fetch('/api/toma_carga');
+        const rows = await res.json();
+        
+        tbody.innerHTML = '';
+        if (rows.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-light);">No hay inscripciones manuales registradas.</td></tr>';
+            return;
+        }
+        
+        rows.forEach(r => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${r.rut}</td>
+                <td>${r.nombre}</td>
+                <td>${r.asignatura}</td>
+                <td>${r.nrc}</td>
+                <td>${r.tipo}</td>
+                <td>${r.comentarios || ''}</td>
+                <td>${new Date(r.fecha_registro).toLocaleString()}</td>
+                <td>
+                    <button type="button" class="btn-pdf" style="background: #e11d48; padding: 4px 8px; font-size: 0.8rem;" onclick="deleteTomaCarga(${r.id})">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: red;">Error al cargar registros.</td></tr>';
+    }
+}
+
+// Attach globally so HTML button can call it
+window.deleteTomaCarga = async function(id) {
+    if (!confirm('¿Está seguro de eliminar esta inscripción?')) return;
+    try {
+        const res = await fetch(`/api/toma_carga/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+            showToast('Registro eliminado', 'success');
+            loadTomaCargaTable();
+        }
+    } catch (err) {
+        showToast('Error al eliminar', 'error');
+    }
+};
+
+document.getElementById('btn-export-tc')?.addEventListener('click', () => {
+    const table = document.getElementById('tc-table');
+    let csv = [];
+    
+    // Header
+    let headerCols = table.rows[0].querySelectorAll('th');
+    let headerRow = [];
+    for (let j = 0; j < headerCols.length - 1; j++) {
+        headerRow.push('"' + headerCols[j].innerText.replace(/"/g, '""') + '"');
+    }
+    csv.push(headerRow.join(';'));
+    
+    // Data Rows
+    for (let i = 1; i < table.rows.length; i++) {
+        let cols = table.rows[i].querySelectorAll('td');
+        if (cols.length <= 1) continue; // Skip "No hay registros" or Error messages
+        
+        let rut = cols[0].innerText;
+        let nombre = cols[1].innerText;
+        let asig = cols[2].innerText;
+        let nrcStr = cols[3].innerText;
+        let tipoStr = cols[4].innerText;
+        let comments = cols[5].innerText;
+        let date = cols[6].innerText;
+        
+        let nrcs = nrcStr.split(',').map(s => s.trim());
+        let tipos = tipoStr.split(',').map(s => s.trim());
+        
+        for (let k = 0; k < nrcs.length; k++) {
+            let row = [
+                '"' + rut.replace(/"/g, '""') + '"',
                 '"' + nombre.replace(/"/g, '""') + '"',
                 '"' + asig.replace(/"/g, '""') + '"',
                 '"' + (nrcs[k] || '').replace(/"/g, '""') + '"',
@@ -3011,3 +3206,97 @@ document.getElementById('btn-export-tc')?.addEventListener('click', () => {
     a.download = `Toma_de_Carga_Manual_${new Date().toISOString().slice(0,10)}.csv`;
     a.click();
 });
+
+// --- MALLA VISUAL LOGIC ---
+document.getElementById('btn-load-malla')?.addEventListener('click', async () => {
+    const rut = document.getElementById('mv-rut').value;
+    const token = document.getElementById('mv-token').value;
+    const carrera = document.getElementById('filter-carrera').value;
+    
+    if (!rut || !token) {
+        Swal.fire('Faltan Datos', 'Ingrese el RUT del estudiante y el Token de SMP.', 'warning');
+        return;
+    }
+    
+    const container = document.getElementById('malla-container');
+    container.innerHTML = '<div style="width: 100%; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 1.1rem;"><i class="fa-solid fa-spinner fa-spin" style="margin-right:10px;"></i> Cargando malla y analizando progreso...</div>';
+    
+    try {
+        const res = await fetch('/api/toma_carga/posibles', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rut, smp_token: token, carrera })
+        });
+        
+        if (res.status === 401) {
+            Swal.fire('Error', 'Token expirado o inválido', 'error');
+            container.innerHTML = '';
+            return;
+        }
+        
+        const data = await res.json();
+        if (!data.success) {
+            Swal.fire('Error', data.message || 'Error al cargar malla', 'error');
+            container.innerHTML = '';
+            return;
+        }
+        
+        renderMalla(data.malla_visual);
+        
+    } catch (err) {
+        console.error(err);
+        Swal.fire('Error', 'No se pudo conectar con el servidor', 'error');
+        container.innerHTML = '';
+    }
+});
+
+function renderMalla(mallaVisual) {
+    const container = document.getElementById('malla-container');
+    container.innerHTML = ''; // clear
+    
+    // Style configurations for states
+    const styles = {
+        'aprobado': 'background: #dcfce7; border: 1px solid #22c55e; color: #166534;',
+        'tomado': 'background: #dbeafe; border: 1px solid #3b82f6; color: #1e40af;',
+        'sugerido': 'background: #fef9c3; border: 2px solid #eab308; color: #854d0e; box-shadow: 0 0 10px rgba(234,179,8,0.4);',
+        'pendiente': 'background: #f1f5f9; border: 1px solid #cbd5e1; color: #64748b;'
+    };
+    
+    const icons = {
+        'aprobado': '<i class="fa-solid fa-check-circle" style="color: #22c55e;"></i>',
+        'tomado': '<i class="fa-solid fa-clock" style="color: #3b82f6;"></i>',
+        'sugerido': '<i class="fa-solid fa-star" style="color: #eab308;"></i>',
+        'pendiente': '<i class="fa-solid fa-lock" style="color: #94a3b8;"></i>'
+    };
+    
+    for (const [nivel, subjects] of Object.entries(mallaVisual)) {
+        // Create column for this level
+        const col = document.createElement('div');
+        col.style.cssText = 'min-width: 200px; max-width: 200px; display: flex; flex-direction: column; gap: 10px;';
+        
+        // Header
+        const header = document.createElement('div');
+        header.style.cssText = 'background: var(--primary-color); color: white; padding: 10px; border-radius: 6px; text-align: center; font-weight: bold;';
+        header.textContent = `Nivel ${parseFloat(nivel).toFixed(0)}`;
+        col.appendChild(header);
+        
+        // Subjects
+        subjects.forEach(sub => {
+            const card = document.createElement('div');
+            card.style.cssText = `padding: 12px; border-radius: 6px; font-size: 0.85rem; display: flex; flex-direction: column; gap: 5px; position: relative; min-height: 80px; ${styles[sub.estado]}`;
+            
+            card.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 5px;">
+                    <div style="font-weight: 700; line-height: 1.2;">${sub.nombre}</div>
+                    <div style="font-size: 1.1rem;">${icons[sub.estado]}</div>
+                </div>
+                <div style="font-size: 0.75rem; opacity: 0.8; margin-top: auto;">
+                    SCT: ${sub.sct}
+                </div>
+            `;
+            col.appendChild(card);
+        });
+        
+        container.appendChild(col);
+    }
+}
