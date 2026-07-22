@@ -2488,7 +2488,13 @@ let tcNrcs = [];
 
 async function initTomaCarga() {
     try {
-        const res = await fetch('/api/toma_carga/asignaturas');
+        let url = '/api/toma_carga/asignaturas';
+        let params = new URLSearchParams();
+        if (globalFilters.carrera) params.append('carrera', globalFilters.carrera);
+        if (globalFilters.jornada) params.append('jornada', globalFilters.jornada);
+        if (params.toString()) url += '?' + params.toString();
+        
+        const res = await fetch(url);
         const data = await res.json();
         tcAsignaturas = data.asignaturas || [];
         tcNrcs = data.nrcs || [];
@@ -2585,9 +2591,14 @@ document.getElementById('tc-asignatura')?.addEventListener('change', (e) => {
         // Ordenar para que el padre quede primero
         group.sort((a, b) => String(a.NRC) === String(parentNrc) ? -1 : 1);
         
-        let label = group.map(n => `${n.NRC} (${n.TIPO_REUNION})`).join(' + ');
+        let label = group.map(n => `${n.NRC} (${n.TIPO_HORARIO || 'TEO'})`).join(' + ');
         let value = group.map(n => n.NRC).join(', ');
-        let tipo = group.map(n => n.TIPO_REUNION).join(', ');
+        let tipo = group.map(n => n.TIPO_HORARIO || 'TEO').join(', ');
+        
+        const seccion = group[0].SECCION;
+        if (seccion) {
+            label = `SECCIÓN ${seccion} - ` + label;
+        }
         
         const opt = document.createElement('option');
         opt.value = value;

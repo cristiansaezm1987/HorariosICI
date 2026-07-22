@@ -1138,13 +1138,9 @@ def get_alumnos_data():
         if os.path.exists(ALUMNOS_CSV_PATH):
             import pandas as pd
             try:
-                # Intenta primero con utf-8-sig (para BOM) o utf-8 normal
-                df = pd.read_csv(ALUMNOS_CSV_PATH, sep=None, engine='python', encoding='utf-8-sig')
-            except UnicodeDecodeError:
-                try:
-                    df = pd.read_csv(ALUMNOS_CSV_PATH, sep=None, engine='python', encoding='latin1')
-                except Exception:
-                    df = pd.read_csv(ALUMNOS_CSV_PATH, sep=None, engine='python', encoding='cp1252')
+                df = pd.read_csv(ALUMNOS_CSV_PATH, sep=None, engine='python', encoding='utf-8-sig', encoding_errors='replace')
+            except Exception:
+                df = pd.read_csv(ALUMNOS_CSV_PATH, sep=None, engine='python', encoding='latin1', encoding_errors='replace')
             
             # Fill NaN values with empty string before converting to dict records
             df = df.fillna('')
@@ -1172,30 +1168,40 @@ def search_alumnos():
 
 @app.route('/api/toma_carga/asignaturas', methods=['GET'])
 def get_toma_carga_asignaturas():
+    carrera = request.args.get('carrera', '')
+    jornada = request.args.get('jornada', '')
     try:
         conn = get_db_connection()
-        cursor = conn.execute('''
-            SELECT DISTINCT MATERIA, CURSO, TITULO
+        query = '''
+            SELECT MATERIA, CURSO, TITULO, NRC, NRC_PADRE, TIPO_HORARIO, SECCION
             FROM planificacion
-            ORDER BY TITULO
-        ''')
-        rows = cursor.fetchall()
-        
-        cursor_nrcs = conn.execute('''
-            SELECT MATERIA, CURSO, TITULO, NRC, NRC_PADRE, TIPO_REUNION
-            FROM planificacion
-        ''')
+            WHERE 1=1
+        '''
+        params = []
+        if carrera:
+            query += ' AND CARRERA = ?'
+            params.append(carrera)
+        if jornada:
+            query += ' AND JORNADA = ?'
+            params.append(jornada)
+            
+        cursor_nrcs = conn.execute(query, params)
         nrcs = [dict(row) for row in cursor_nrcs.fetchall()]
         conn.close()
         
-        asignaturas = []
-        for r in rows:
-            asignaturas.append({
-                'materia': r['MATERIA'],
-                'curso': r['CURSO'],
-                'titulo': r['TITULO'],
-                'label': f"{r['MATERIA']} {r['CURSO']} - {r['TITULO']}"
-            })
+        asignaturas_dict = {}
+        for n in nrcs:
+            key = f"{n['MATERIA']} {n['CURSO']} - {n['TITULO']}"
+            if key not in asignaturas_dict:
+                asignaturas_dict[key] = {
+                    'materia': n['MATERIA'],
+                    'curso': n['CURSO'],
+                    'titulo': n['TITULO'],
+                    'label': key
+                }
+        
+        asignaturas = list(asignaturas_dict.values())
+        asignaturas.sort(key=lambda x: x['label'])
             
         return jsonify({
             'asignaturas': asignaturas,
