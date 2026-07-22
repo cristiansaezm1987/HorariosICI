@@ -1485,7 +1485,12 @@ def posibles_toma_carga():
     all_schedules = [sched for x in enrolled_info for sched in x['schedule']]
     
     # Get all distinct NRCs from database
-    cursor.execute("SELECT DISTINCT NRC FROM planificacion")
+    carrera = data.get('carrera')
+    if carrera:
+        cursor.execute("SELECT DISTINCT NRC FROM planificacion WHERE CARRERA = ?", (carrera,))
+    else:
+        cursor.execute("SELECT DISTINCT NRC FROM planificacion")
+        
     all_nrcs_in_db = [row['NRC'] for row in cursor.fetchall()]
     all_nrcs_info = get_nrc_info(cursor, all_nrcs_in_db)
     

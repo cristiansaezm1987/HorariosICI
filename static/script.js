@@ -2645,6 +2645,7 @@ document.getElementById('tc-nrc')?.addEventListener('change', (e) => {
 document.getElementById('btn-recomendar-ramos')?.addEventListener('click', async () => {
     const rut = document.getElementById('tc-rut').value;
     const token = document.getElementById('tc-smp-token').value;
+    const carrera = document.getElementById('filter-carrera').value;
     const btn = document.getElementById('btn-recomendar-ramos');
     
     if (!rut || !token) {
@@ -2656,6 +2657,15 @@ document.getElementById('btn-recomendar-ramos')?.addEventListener('click', async
         return;
     }
     
+    if (!carrera) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Carrera no seleccionada',
+            text: 'Por favor, seleccione una carrera en el filtro global de la izquierda para recomendar asignaturas correspondientes a la malla correcta.'
+        });
+        return;
+    }
+    
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Calculando...';
     btn.disabled = true;
     
@@ -2663,7 +2673,7 @@ document.getElementById('btn-recomendar-ramos')?.addEventListener('click', async
         const res = await fetch('/api/toma_carga/posibles', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ rut, smp_token: token })
+            body: JSON.stringify({ rut, smp_token: token, carrera: carrera })
         });
         
         const result = await res.json();
