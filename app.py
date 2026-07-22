@@ -179,6 +179,9 @@ def init_db():
     conn.commit()
     conn.close()
 
+# Initialize DB on startup (especially for serverless environments)
+init_db()
+
 def clean_value(val, col_type):
     if not val:
         return None
