@@ -2699,33 +2699,19 @@ document.getElementById('btn-recomendar-ramos')?.addEventListener('click', async
             <p style="margin-bottom: 10px;"><b>Asignaturas Recomendadas:</b></p>
             <div style="max-height: 350px; overflow-y: auto;">`;
             
-        result.posibles.forEach(r => {
-            html += `<div style="background: white; border: 1px solid #cbd5e1; padding: 10px; margin-bottom: 8px; border-radius: 6px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--primary-color)'" onmouseout="this.style.borderColor='#cbd5e1'" onclick="
-                const asigSelect = document.getElementById('tc-asignatura');
-                for (let i=0; i<asigSelect.options.length; i++) {
-                    if (asigSelect.options[i].text.includes('${r.titulo.replace("'", "\\'")}')) {
-                        asigSelect.selectedIndex = i;
-                        asigSelect.dispatchEvent(new Event('change'));
-                        Swal.close();
-                        setTimeout(() => {
-                            const nrcSelect = document.getElementById('tc-nrc');
-                            for (let j=0; j<nrcSelect.options.length; j++) {
-                                if (nrcSelect.options[j].value === '${r.nrcs.join(', ')}') {
-                                    nrcSelect.selectedIndex = j;
-                                    nrcSelect.dispatchEvent(new Event('change'));
-                                    break;
-                                }
-                            }
-                        }, 200);
-                        break;
-                    }
-                }
-            ">
-                <div style="font-weight: 600; color: var(--primary-color);">${r.titulo}</div>
-                <div style="font-size: 0.85rem; color: #64748b; margin-top: 4px;">
-                    Nivel: ${r.nivel} | SCT: ${r.sct} | NRCs: ${r.nrcs.join(', ')}
+        result.posibles.forEach((r, idx) => {
+            html += `<label style="display: flex; align-items: flex-start; background: white; border: 1px solid #cbd5e1; padding: 10px; margin-bottom: 8px; border-radius: 6px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='var(--primary-color)'" onmouseout="this.style.borderColor='#cbd5e1'">
+                <input type="checkbox" class="recomendar-checkbox" style="margin-top: 4px; margin-right: 12px; width: 18px; height: 18px; cursor: pointer;" 
+                    data-titulo="${r.titulo.replace(/"/g, '&quot;')}" 
+                    data-nrcs="${r.nrcs.join(', ')}"
+                    data-tipo="TEO">
+                <div>
+                    <div style="font-weight: 600; color: var(--primary-color);">${r.titulo}</div>
+                    <div style="font-size: 0.85rem; color: #64748b; margin-top: 4px;">
+                        Nivel: ${r.nivel} | SCT: ${r.sct} | NRCs: ${r.nrcs.join(', ')}
+                    </div>
                 </div>
-            </div>`;
+            </label>`;
         });
         
         html += `</div></div>`;
@@ -2734,8 +2720,86 @@ document.getElementById('btn-recomendar-ramos')?.addEventListener('click', async
             title: 'Ramos Posibles',
             html: html,
             width: '600px',
-            showConfirmButton: false,
-            showCloseButton: true
+            showConfirmButton: true,
+            confirmButtonText: '<i class="fa-solid fa-plus"></i> Añadir Seleccionados',
+            confirmButtonColor: 'var(--primary-color)',
+            showCancelButton: true,
+            cancelButtonText: 'Cancelar',
+            showCloseButton: true,
+            preConfirm: async () => {
+                const checkboxes = document.querySelectorAll('.recomendar-checkbox:checked');
+                if (checkboxes.length === 0) {
+                    Swal.showValidationMessage('Debe seleccionar al menos una asignatura');
+                    return false;
+                }
+                
+                const selectedData = Array.from(checkboxes).map(cb => ({
+                    titulo: cb.dataset.titulo,
+                    nrcs: cb.dataset.nrcs,
+                    tipo: cb.dataset.tipo
+                }));
+                
+                // Collect all NRCs to validate together
+                let allNrcs = [];
+                selectedData.forEach(item => {
+                    allNrcs.push(...item.nrcs.split(',').map(n => n.trim()));
+                });
+                
+                // 1. Validate all together against SMP
+                const validRes = await fetch('/api/toma_carga/validar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        rut: rut,
+                        nrcs: allNrcs,
+                        smp_token: token
+                    })
+                });
+                
+                if (validRes.status === 401) {
+                    Swal.showValidationMessage('Token Inválido. Por favor, actualiza tu token de SMP.');
+                    return false;
+                }
+                
+                const validData = await validRes.json();
+                if (!validData.success) {
+                    const errorListHtml = '<ul style="text-align: left; font-size: 0.9rem;">' + 
+                        (validData.errors || [validData.message]).map(e => `<li style="margin-bottom:5px;">${e}</li>`).join('') + 
+                        '</ul>';
+                    Swal.showValidationMessage(`Existen conflictos entre las opciones seleccionadas o exceden el límite SCT:<br>${errorListHtml}`);
+                    return false;
+                }
+                
+                // 2. Save them sequentially
+                const nombre = document.getElementById('tc-nombre').value || 'Desconocido';
+                
+                for (const item of selectedData) {
+                    await fetch('/api/toma_carga', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            rut: rut,
+                            nombre: nombre,
+                            asignatura: item.titulo,
+                            nrc: item.nrcs,
+                            tipo: item.tipo,
+                            comentarios: 'Agregado desde Recomendador Automático'
+                        })
+                    });
+                }
+                
+                return selectedData.length;
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Inscripciones Registradas!',
+                    text: `Se han añadido ${result.value} asignaturas a la lista.`,
+                    timer: 3000
+                });
+                loadTcInscriptions();
+            }
         });
         
     } catch (error) {
