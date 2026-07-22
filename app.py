@@ -1136,10 +1136,19 @@ def get_alumnos_data():
     if _alumnos_cache is None:
         _alumnos_cache = []
         if os.path.exists(ALUMNOS_CSV_PATH):
-            with open(ALUMNOS_CSV_PATH, 'r', encoding='latin-1') as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    _alumnos_cache.append(row)
+            import pandas as pd
+            try:
+                # Intenta primero con utf-8-sig (para BOM) o utf-8 normal
+                df = pd.read_csv(ALUMNOS_CSV_PATH, sep=None, engine='python', encoding='utf-8-sig')
+            except UnicodeDecodeError:
+                try:
+                    df = pd.read_csv(ALUMNOS_CSV_PATH, sep=None, engine='python', encoding='latin1')
+                except Exception:
+                    df = pd.read_csv(ALUMNOS_CSV_PATH, sep=None, engine='python', encoding='cp1252')
+            
+            # Fill NaN values with empty string before converting to dict records
+            df = df.fillna('')
+            _alumnos_cache = df.to_dict('records')
     return _alumnos_cache
 
 @app.route('/api/alumnos/search', methods=['GET'])

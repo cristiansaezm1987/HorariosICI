@@ -2568,11 +2568,31 @@ document.getElementById('tc-asignatura')?.addEventListener('change', (e) => {
     if (!asig) return;
     
     const relatedNrcs = tcNrcs.filter(n => n.MATERIA === asig.materia && n.CURSO === asig.curso);
+    
+    // Agrupar NRCs por Padre
+    let groups = {};
     relatedNrcs.forEach(n => {
+        let parentNrc = n.NRC_PADRE || n.NRC;
+        if (!groups[parentNrc]) groups[parentNrc] = [];
+        // Evitar duplicados si hay algún error en la data
+        if (!groups[parentNrc].some(existing => existing.NRC === n.NRC)) {
+            groups[parentNrc].push(n);
+        }
+    });
+    
+    Object.keys(groups).forEach(parentNrc => {
+        const group = groups[parentNrc];
+        // Ordenar para que el padre quede primero
+        group.sort((a, b) => String(a.NRC) === String(parentNrc) ? -1 : 1);
+        
+        let label = group.map(n => `${n.NRC} (${n.TIPO_REUNION})`).join(' + ');
+        let value = group.map(n => n.NRC).join(', ');
+        let tipo = group.map(n => n.TIPO_REUNION).join(', ');
+        
         const opt = document.createElement('option');
-        opt.value = n.NRC;
-        opt.textContent = `${n.NRC} (${n.TIPO_REUNION})`;
-        opt.dataset.tipo = n.TIPO_REUNION;
+        opt.value = value;
+        opt.textContent = label;
+        opt.dataset.tipo = tipo;
         nrcSelect.appendChild(opt);
     });
 });
