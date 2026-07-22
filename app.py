@@ -207,6 +207,15 @@ def get_malla_id_by_name(asignatura_name):
     
     name_norm = normalize_text(name)
     
+    ELECTIVE_MAPPING = {
+        'COMUNICACION EN CONTEXTO': '10',
+        'DRLLO. PERSONAL Y PLAN DE VIDA': '32',
+        'RESP SOCIAL UNIV E INNO SOC': '56'
+    }
+    for k, v in ELECTIVE_MAPPING.items():
+        if normalize_text(k) == name_norm:
+            return v
+            
     # Exact match first
     for id, data in MALLA_DATA.items():
         if normalize_text(data['nombre']) == name_norm:
