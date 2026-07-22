@@ -3259,6 +3259,7 @@ function renderMalla(mallaVisual) {
         'aprobado': 'background: #dcfce7; border: 1px solid #22c55e; color: #166534;',
         'tomado': 'background: #dbeafe; border: 1px solid #3b82f6; color: #1e40af;',
         'sugerido': 'background: #fef9c3; border: 2px solid #eab308; color: #854d0e; box-shadow: 0 0 10px rgba(234,179,8,0.4);',
+        'tope': 'background: #ffedd5; border: 1px solid #f97316; color: #9a3412;',
         'pendiente': 'background: #f1f5f9; border: 1px solid #cbd5e1; color: #64748b;'
     };
     
@@ -3266,6 +3267,7 @@ function renderMalla(mallaVisual) {
         'aprobado': '<i class="fa-solid fa-check-circle" style="color: #22c55e;"></i>',
         'tomado': '<i class="fa-solid fa-clock" style="color: #3b82f6;"></i>',
         'sugerido': '<i class="fa-solid fa-star" style="color: #eab308;"></i>',
+        'tope': '<i class="fa-solid fa-calendar-xmark" style="color: #f97316;"></i>',
         'pendiente': '<i class="fa-solid fa-lock" style="color: #94a3b8;"></i>'
     };
     
@@ -3285,13 +3287,18 @@ function renderMalla(mallaVisual) {
             const card = document.createElement('div');
             card.style.cssText = `padding: 12px; border-radius: 6px; font-size: 0.85rem; display: flex; flex-direction: column; gap: 5px; position: relative; min-height: 80px; ${styles[sub.estado]}`;
             
+            let extraInfo = `SCT: ${sub.sct}`;
+            if (sub.estado === 'tope' && sub.motivo_bloqueo) {
+                extraInfo = `<span style="color: #c2410c; font-weight: 500;">${sub.motivo_bloqueo}</span><br>SCT: ${sub.sct}`;
+            }
+            
             card.innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 5px;">
                     <div style="font-weight: 700; line-height: 1.2;">${sub.nombre}</div>
                     <div style="font-size: 1.1rem;">${icons[sub.estado]}</div>
                 </div>
                 <div style="font-size: 0.75rem; opacity: 0.8; margin-top: auto;">
-                    SCT: ${sub.sct}
+                    ${extraInfo}
                 </div>
             `;
             col.appendChild(card);

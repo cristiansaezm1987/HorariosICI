@@ -1252,7 +1252,7 @@ def get_nrc_info(cursor, nrcs):
         schedule_entries = []
         for day_name, val in days:
             if val == 'Y':
-                schedule_entries.append({'day': day_name, 'start': hi, 'end': hf})
+                schedule_entries.append({'day': day_name, 'start': hi, 'end': hf, 'titulo': row['TITULO']})
                 
         if nrc not in results_dict:
             results_dict[nrc] = {
@@ -1482,7 +1482,7 @@ def posibles_toma_carga():
             break
             
     sct_actual = sum(x['sct'] for x in enrolled_info)
-    all_schedules = [sched for x in enrolled_info for sched in x['schedule']]
+    all_schedules = [x['schedule'] for x in enrolled_info]
     
     # Get all distinct NRCs from database
     carrera = data.get('carrera')
@@ -1497,6 +1497,7 @@ def posibles_toma_carga():
     conn.close()
     
     posibles = []
+    topes_horario = {}
     
     for ni in all_nrcs_info:
         # Rule 5: Already Approved
@@ -1527,12 +1528,23 @@ def posibles_toma_carga():
             
         # Rule 2: Schedule Conflict
         conflict = False
+        conflict_with = None
         for sched in all_schedules:
             if check_schedule_conflict(ni['schedule'], sched):
                 conflict = True
+                # Get the title of the conflicting subject from the first overlapping entry
+                for s1 in ni['schedule']:
+                    for s2 in sched:
+                        if s1['day'] == s2['day'] and max(s1['start'], s2['start']) < min(s1['end'], s2['end']):
+                            conflict_with = s2.get('titulo', 'Desconocido')
+                            break
+                    if conflict_with:
+                        break
                 break
                 
         if conflict:
+            if ni['id_malla']:
+                topes_horario[ni['id_malla']] = conflict_with
             continue
             
         # Passed all checks!
@@ -1564,18 +1576,24 @@ def posibles_toma_carga():
             malla_visual[nivel] = []
             
         estado = 'pendiente'
+        motivo_bloqueo = None
+        
         if historial.get(id_malla, {}).get('aprobado', False):
             estado = 'aprobado'
         elif id_malla in enrolled_malla_ids:
             estado = 'tomado'
         elif id_malla in sugeridos_malla_ids:
             estado = 'sugerido'
+        elif id_malla in topes_horario:
+            estado = 'tope'
+            motivo_bloqueo = f"Tope con {topes_horario[id_malla]}"
             
         malla_visual[nivel].append({
             'id_malla': id_malla,
             'nombre': data['nombre'],
             'sct': data['sct'],
-            'estado': estado
+            'estado': estado,
+            'motivo_bloqueo': motivo_bloqueo
         })
         
     return jsonify({
