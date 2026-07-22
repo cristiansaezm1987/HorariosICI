@@ -2589,25 +2589,51 @@ document.getElementById('tc-asignatura')?.addEventListener('change', (e) => {
         }
     });
     
+    const getCombinations = (arrays) => {
+        if (arrays.length === 0) return [];
+        if (arrays.length === 1) return arrays[0].map(x => [x]);
+        return arrays.reduce((a, b) => a.flatMap(d => b.map(e => [d, e].flat())));
+    };
+    
     Object.keys(groups).forEach(parentNrc => {
         const group = groups[parentNrc];
-        // Ordenar para que el padre quede primero
-        group.sort((a, b) => String(a.NRC) === String(parentNrc) ? -1 : 1);
         
-        let label = group.map(n => `${n.NRC} (${n.TIPO_HORARIO || 'TEO'})`).join(' + ');
-        let value = group.map(n => n.NRC).join(', ');
-        let tipo = group.map(n => n.TIPO_HORARIO || 'TEO').join(', ');
+        // Separar por TIPO_HORARIO
+        const byType = {};
+        group.forEach(n => {
+            const tipo = n.TIPO_HORARIO || 'TEO';
+            if (!byType[tipo]) byType[tipo] = [];
+            byType[tipo].push(n);
+        });
         
-        const seccion = group[0].SECCION;
-        if (seccion) {
-            label = `SECCIÓN ${seccion} - ` + label;
-        }
+        // Asegurar orden: TEO primero, luego AYU, luego LAB, luego otros
+        const order = { 'TEO': 1, 'AYU': 2, 'LAB': 3, 'APM': 4, 'TER': 5 };
+        const sortedTypes = Object.keys(byType).sort((a, b) => (order[a] || 99) - (order[b] || 99));
         
-        const opt = document.createElement('option');
-        opt.value = value;
-        opt.textContent = label;
-        opt.dataset.tipo = tipo;
-        nrcSelect.appendChild(opt);
+        const arraysToCombine = sortedTypes.map(t => byType[t]);
+        const combinations = getCombinations(arraysToCombine);
+        
+        combinations.forEach((combo, idx) => {
+            // Ordenar el combo para que quede igual que el orden de los tipos
+            combo.sort((a, b) => (order[a.TIPO_HORARIO || 'TEO'] || 99) - (order[b.TIPO_HORARIO || 'TEO'] || 99));
+            
+            let label = combo.map(n => `${n.NRC} (${n.TIPO_HORARIO || 'TEO'})`).join(' + ');
+            let value = combo.map(n => n.NRC).join(', ');
+            let tipo = combo.map(n => n.TIPO_HORARIO || 'TEO').join(', ');
+            
+            const seccion = combo[0].SECCION;
+            if (seccion) {
+                // Agregar un sub-índice si hay más de una combinación (ej. Opción A, B, C...)
+                const optionLetter = combinations.length > 1 ? ` (Opción ${String.fromCharCode(65 + idx)})` : '';
+                label = `SECCIÓN ${seccion}${optionLetter} - ` + label;
+            }
+            
+            const opt = document.createElement('option');
+            opt.value = value;
+            opt.textContent = label;
+            opt.dataset.tipo = tipo;
+            nrcSelect.appendChild(opt);
+        });
     });
 });
 
