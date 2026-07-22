@@ -1330,10 +1330,21 @@ def validar_toma_carga():
             return jsonify({'success': False, 'message': 'Token de SMP inválido o expirado. Por favor, actualiza tu Token.'}), 401
         r.raise_for_status()
         smp_data = r.json()
+        
+        # 2. Fetch from SMP (horario)
+        url_horario = f"https://apismp.uautonoma.cl/estudiantes/horario?pagina=0&registros=1000000&id={rut_clean}&periodo=202620"
+        headers['endpoint'] = url_horario
+        r_horario = requests.get(url_horario, headers=headers, timeout=10)
+        r_horario.raise_for_status()
+        smp_horario = r_horario.json()
+        
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error conectando a SMP: {str(e)}'}), 500
         
-    historial, enrolled_nrcs = parse_avance(smp_data, target_period="202620")
+    historial, _ = parse_avance(smp_data, target_period="202620")
+    
+    enrolled_nrcs = list(set([row.get('nrc') for row in smp_horario.get('data', []) if row.get('nrc')]))
+
     
     # Calculate Nivel Base
     niveles_completos = []
