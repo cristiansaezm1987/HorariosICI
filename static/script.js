@@ -263,6 +263,7 @@ function setupEventListeners() {
     // Global filters change
     document.getElementById('filter-carrera').addEventListener('change', (e) => {
         globalFilters.carrera = e.target.value;
+        tcAsignaturas = []; // Force refresh on toma-carga tab
         selectedNivel = '';
         const selectNivel = document.getElementById('select-nivel');
         if (selectNivel) selectNivel.value = '';
@@ -274,6 +275,7 @@ function setupEventListeners() {
 
     document.getElementById('filter-jornada').addEventListener('change', (e) => {
         globalFilters.jornada = e.target.value;
+        tcAsignaturas = []; // Force refresh on toma-carga tab
         loadGlobalFilters().then(() => refreshActiveTab());
     });
 
@@ -282,6 +284,7 @@ function setupEventListeners() {
         document.getElementById('filter-jornada').value = '';
         globalFilters.carrera = '';
         globalFilters.jornada = '';
+        tcAsignaturas = []; // Force refresh on toma-carga tab
         
         selectedNivel = '';
         const selectNivel = document.getElementById('select-nivel');
