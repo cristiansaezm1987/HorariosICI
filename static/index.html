@@ -647,7 +647,10 @@
                     
                     <form id="toma-carga-form" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                         <div class="filter-group" style="grid-column: 1 / -1;">
-                            <label for="tc-smp-token"><i class="fa-solid fa-key" style="color: #f59e0b;"></i> Token de Autorización SMP (Bearer)</label>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                                <label for="tc-smp-token" style="margin: 0;"><i class="fa-solid fa-key" style="color: #f59e0b;"></i> Token de Autorización SMP (Bearer)</label>
+                                <button type="button" id="btn-auto-token-tc" class="btn-primary" style="padding: 4px 10px; font-size: 0.8rem; background-color: #f59e0b; border: none; border-radius: 4px; color: white; cursor: pointer;"><i class="fa-solid fa-robot"></i> Obtener Automáticamente</button>
+                            </div>
                             <input type="text" id="tc-smp-token" placeholder="Pega aquí el texto completo del Bearer Token..." required autocomplete="off" style="padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; width: 100%; font-family: monospace; font-size: 0.85rem; border-color: #f59e0b;">
                             <small style="color: var(--text-light); margin-top: 5px; display: block;">Necesario para conectarse a SMP y validar las reglas de inscripción.</small>
                         </div>
@@ -743,7 +746,10 @@
                         <input type="text" id="mv-rut" placeholder="Ej: 12345678-9" style="padding: 10px; width: 100%; border: 1px solid var(--border-color); border-radius: 4px;">
                     </div>
                     <div style="flex: 1; min-width: 250px;">
-                        <label for="mv-token" style="display:block; margin-bottom:5px; font-weight: 500;">Token SMP</label>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <label for="mv-token" style="margin: 0; font-weight: 500;">Token SMP</label>
+                            <button type="button" id="btn-auto-token-mv" class="btn-primary" style="padding: 4px 10px; font-size: 0.8rem; background-color: #f59e0b; border: none; border-radius: 4px; color: white; cursor: pointer;"><i class="fa-solid fa-robot"></i> Automático</button>
+                        </div>
                         <input type="password" id="mv-token" placeholder="Bearer eyJhb..." style="padding: 10px; width: 100%; border: 1px solid var(--border-color); border-radius: 4px;">
                     </div>
                     <div>

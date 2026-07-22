@@ -1703,6 +1703,24 @@ def delete_toma_carga(record_id):
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@app.route('/api/smp/auto-login', methods=['POST'])
+def auto_login_smp():
+    script_path = os.path.join(os.path.dirname(__file__), 'capture_token.py')
+    import subprocess
+    import sys
+    try:
+        # Run playwright script, wait up to 120s
+        result = subprocess.run([sys.executable, script_path], capture_output=True, text=True, timeout=120)
+        if result.returncode == 0:
+            token = result.stdout.strip()
+            return jsonify({'success': True, 'token': token})
+        else:
+            return jsonify({'success': False, 'message': 'No se pudo capturar el token. ¿Cerraste la ventana antes de entrar?'}), 400
+    except subprocess.TimeoutExpired:
+        return jsonify({'success': False, 'message': 'Tiempo de espera agotado.'}), 408
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 if __name__ == '__main__':
     # Ensure database is initialized
     init_db()

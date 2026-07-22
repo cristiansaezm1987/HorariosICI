@@ -70,6 +70,63 @@ function isSessionInBlock(session, block) {
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
+    // Check if the current page has a token already set in memory/storage if needed
+    // (Optional: restore token from localStorage)
+    const savedToken = localStorage.getItem('smp_auto_token');
+    if (savedToken) {
+        const tcToken = document.getElementById('tc-smp-token');
+        const mvToken = document.getElementById('mv-token');
+        if (tcToken) tcToken.value = savedToken;
+        if (mvToken) mvToken.value = savedToken;
+    }
+
+    // Auto token handlers
+    const setupAutoTokenBtn = (btnId, inputId) => {
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+        btn.addEventListener('click', async () => {
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Obteniendo...';
+            btn.disabled = true;
+            
+            try {
+                const res = await fetch('/api/smp/auto-login', { method: 'POST' });
+                const data = await res.json();
+                
+                if (data.success && data.token) {
+                    const input = document.getElementById(inputId);
+                    if (input) input.value = data.token;
+                    localStorage.setItem('smp_auto_token', data.token);
+                    
+                    Swal.fire({
+                        icon: 'success',
+                        title: '¡Token Obtenido!',
+                        text: 'El token se extrajo automáticamente y se guardó para tu sesión.',
+                        timer: 3000,
+                        showConfirmButton: false
+                    });
+                    
+                    // Sync the other token input if it exists
+                    const otherInput = inputId === 'tc-smp-token' ? document.getElementById('mv-token') : document.getElementById('tc-smp-token');
+                    if (otherInput) otherInput.value = data.token;
+                    
+                } else {
+                    Swal.fire('Error', data.message || 'No se pudo obtener el token. Asegúrate de cerrar la ventana externa sólo después de que inicie sesión.', 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                Swal.fire('Error de Conexión', 'Hubo un problema al intentar conectar con el robot.', 'error');
+            } finally {
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            }
+        });
+    };
+
+    setupAutoTokenBtn('btn-auto-token-tc', 'tc-smp-token');
+    setupAutoTokenBtn('btn-auto-token-mv', 'mv-token');
+
+    // Restore sidebar stateners();
     setupEventListeners();
     initApp();
 });
