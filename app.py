@@ -217,43 +217,26 @@ def get_malla_id_by_name(asignatura_name):
             
     return None
 
-def parse_avance(json_data, target_period="202620"):
+import re
+
+def parse_malla_api(json_data):
     data = json_data.get('data', [])
     historial = {}
-    enrolled_nrcs = []
     
     for row in data:
-        asig = row.get('asignatura', '')
-        id_malla = get_malla_id_by_name(asig)
-        if not id_malla:
-            continue
-            
-        aprobado = False
-        for k in ['primera', 'segunda', 'tercera', 'cuarta', 'quinta']:
-            val = row.get(k)
-            if val and isinstance(val, str):
-                if f"P:{target_period}" in val:
-                    parts = val.split('Nrc:')
-                    if len(parts) > 1:
-                        nrc_part = parts[1].split('-')[0].strip()
-                        enrolled_nrcs.append(nrc_part)
-                
-                parts = val.split('Nota:')
-                if len(parts) > 1:
-                    nota_str = parts[1].strip()
-                    if nota_str in ['A', 'EX']:
-                        aprobado = True
-                        break
-                    try:
-                        nota_float = float(nota_str.replace(',', '.'))
-                        if nota_float >= 4.0:
-                            aprobado = True
-                            break
-                    except:
-                        pass
-        historial[id_malla] = {'aprobado': aprobado}
+        for k, v in row.items():
+            if k.startswith('nivel') and v:
+                aprobado = '#AP#' in v
+                parts = v.split('-', 1)
+                if len(parts) == 2:
+                    name = parts[1].split('#')[0].strip()
+                    # Remove the period suffix if present (e.g., " 202620")
+                    name = re.sub(r'\s+\d{6}$', '', name).strip()
+                    id_malla = get_malla_id_by_name(name)
+                    if id_malla:
+                        historial[id_malla] = {'aprobado': aprobado}
     
-    return historial, enrolled_nrcs
+    return historial
 
 def clean_value(val, col_type):
     if not val:
@@ -1309,8 +1292,8 @@ def validar_toma_carga():
     # Remove DV if present
     rut_clean = rut.split('-')[0].replace('.', '')
     
-    # 1. Fetch from SMP
-    url = f"https://apismp.uautonoma.cl/estudiantes/avance?pagina=0&registros=100&id={rut_clean}&programa=ICIND_111"
+    # 1. Fetch from SMP (malla)
+    url = f"https://apismp.uautonoma.cl/estudiantes/malla?pagina=0&registros=1000000&id={rut_clean}&programa=ICIND_111"
     headers = {
         'Accept': '*/*',
         'Authorization': f'Bearer {token_clean}',
@@ -1341,7 +1324,7 @@ def validar_toma_carga():
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error conectando a SMP: {str(e)}'}), 500
         
-    historial, _ = parse_avance(smp_data, target_period="202620")
+    historial = parse_malla_api(smp_data)
     
     enrolled_nrcs = list(set([row.get('nrc') for row in smp_horario.get('data', []) if row.get('nrc')]))
 
