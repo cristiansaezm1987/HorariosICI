@@ -2738,14 +2738,45 @@ window.deleteTomaCarga = async function(id) {
 document.getElementById('btn-export-tc')?.addEventListener('click', () => {
     const table = document.getElementById('tc-table');
     let csv = [];
-    for (let i = 0; i < table.rows.length; i++) {
-        let row = [], cols = table.rows[i].querySelectorAll('td, th');
-        for (let j = 0; j < cols.length - 1; j++) {
-            row.push('"' + cols[j].innerText.replace(/"/g, '""') + '"');
-        }
-        csv.push(row.join(';'));
+    
+    // Header
+    let headerCols = table.rows[0].querySelectorAll('th');
+    let headerRow = [];
+    for (let j = 0; j < headerCols.length - 1; j++) {
+        headerRow.push('"' + headerCols[j].innerText.replace(/"/g, '""') + '"');
     }
-    const csvFile = new Blob(["\\ufeff" + csv.join('\\n')], {type: "text/csv;charset=utf-8;"});
+    csv.push(headerRow.join(';'));
+    
+    // Data Rows
+    for (let i = 1; i < table.rows.length; i++) {
+        let cols = table.rows[i].querySelectorAll('td');
+        if (cols.length <= 1) continue; // Skip "No hay registros" or Error messages
+        
+        let rut = cols[0].innerText;
+        let nombre = cols[1].innerText;
+        let asig = cols[2].innerText;
+        let nrcStr = cols[3].innerText;
+        let tipoStr = cols[4].innerText;
+        let comments = cols[5].innerText;
+        let date = cols[6].innerText;
+        
+        let nrcs = nrcStr.split(',').map(s => s.trim());
+        let tipos = tipoStr.split(',').map(s => s.trim());
+        
+        for (let k = 0; k < nrcs.length; k++) {
+            let row = [
+                '"' + rut.replace(/"/g, '""') + '"',
+                '"' + nombre.replace(/"/g, '""') + '"',
+                '"' + asig.replace(/"/g, '""') + '"',
+                '"' + (nrcs[k] || '').replace(/"/g, '""') + '"',
+                '"' + (tipos[k] || '').replace(/"/g, '""') + '"',
+                '"' + comments.replace(/"/g, '""') + '"',
+                '"' + date.replace(/"/g, '""') + '"'
+            ];
+            csv.push(row.join(';'));
+        }
+    }
+    const csvFile = new Blob(["\ufeff" + csv.join('\n')], {type: "text/csv;charset=utf-8;"});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(csvFile);
     a.download = `Toma_de_Carga_Manual_${new Date().toISOString().slice(0,10)}.csv`;
