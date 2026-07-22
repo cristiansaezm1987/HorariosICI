@@ -1204,12 +1204,12 @@ def download_programa():
 # ==========================================
 # TOMA DE CARGA (MANUAL REGISTRATION)
 # ==========================================
-ALUMNOS_CSV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'alumnos', 'Matrícula Total 202620.csv')
+ALUMNOS_CSV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'alumnos', 'Matricula_Total_202620.csv')
 _alumnos_cache = None
 
 def get_alumnos_data():
     global _alumnos_cache
-    if _alumnos_cache is None:
+    if not _alumnos_cache:
         _alumnos_cache = []
         if os.path.exists(ALUMNOS_CSV_PATH):
             import pandas as pd
