@@ -643,6 +643,12 @@
                     <p style="color: var(--text-light); margin-bottom: 20px;">Formulario para inscripción manual de estudiantes con problemas en la toma de carga oficial.</p>
                     
                     <form id="toma-carga-form" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div class="filter-group" style="grid-column: 1 / -1;">
+                            <label for="tc-smp-token"><i class="fa-solid fa-key" style="color: #f59e0b;"></i> Token de Autorización SMP (Bearer)</label>
+                            <input type="text" id="tc-smp-token" placeholder="Pega aquí el texto completo del Bearer Token..." required autocomplete="off" style="padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; width: 100%; font-family: monospace; font-size: 0.85rem; border-color: #f59e0b;">
+                            <small style="color: var(--text-light); margin-top: 5px; display: block;">Necesario para conectarse a SMP y validar las reglas de inscripción.</small>
+                        </div>
+                        
                         <div class="filter-group">
                             <label for="tc-rut">RUT Estudiante (Sin guión ni puntos, ej: 199976591)</label>
                             <input type="text" id="tc-rut" placeholder="Escriba el RUT para autocompletar..." required autocomplete="off" style="padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; width: 100%;">

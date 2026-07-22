@@ -6,6 +6,7 @@ import tempfile
 import shutil
 from flask import Flask, request, jsonify, send_from_directory, session, redirect, url_for
 import smtplib
+import requests
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
@@ -181,6 +182,78 @@ def init_db():
 
 # Initialize DB on startup (especially for serverless environments)
 init_db()
+
+# Load Malla Curricular
+MALLA_DATA = {}
+try:
+    malla_path = os.path.join(os.path.dirname(__file__), 'malla.csv')
+    if os.path.exists(malla_path):
+        with open(malla_path, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                MALLA_DATA[row['ID']] = {
+                    'nombre': row['ASIGNATURA'],
+                    'nivel': float(row['NIVEL']),
+                    'requisitos': [r.strip() for r in row['REQUISITO'].split(',')] if row['REQUISITO'] else [],
+                    'sct': int(row['SCT']) if row['SCT'] else 0
+                }
+except Exception as e:
+    print(f"Error loading malla.csv: {e}")
+
+def get_malla_id_by_name(asignatura_name):
+    if not asignatura_name: return None
+    parts = asignatura_name.split('-', 1)
+    name = parts[1].strip().upper() if len(parts) > 1 else asignatura_name.strip().upper()
+    
+    # Exact match first
+    for id, data in MALLA_DATA.items():
+        if data['nombre'] == name:
+            return id
+            
+    # Fallback to substring
+    for id, data in MALLA_DATA.items():
+        if name in data['nombre'] or data['nombre'] in name:
+            return id
+            
+    return None
+
+def parse_avance(json_data, target_period="202620"):
+    data = json_data.get('data', [])
+    historial = {}
+    enrolled_nrcs = []
+    
+    for row in data:
+        asig = row.get('asignatura', '')
+        id_malla = get_malla_id_by_name(asig)
+        if not id_malla:
+            continue
+            
+        aprobado = False
+        for k in ['primera', 'segunda', 'tercera', 'cuarta', 'quinta']:
+            val = row.get(k)
+            if val and isinstance(val, str):
+                if f"P:{target_period}" in val:
+                    parts = val.split('Nrc:')
+                    if len(parts) > 1:
+                        nrc_part = parts[1].split('-')[0].strip()
+                        enrolled_nrcs.append(nrc_part)
+                
+                parts = val.split('Nota:')
+                if len(parts) > 1:
+                    nota_str = parts[1].strip()
+                    if nota_str in ['A', 'EX']:
+                        aprobado = True
+                        break
+                    try:
+                        nota_float = float(nota_str.replace(',', '.'))
+                        if nota_float >= 4.0:
+                            aprobado = True
+                            break
+                    except:
+                        pass
+        historial[id_malla] = {'aprobado': aprobado}
+    
+    return historial, enrolled_nrcs
 
 def clean_value(val, col_type):
     if not val:
@@ -1168,6 +1241,163 @@ def search_alumnos():
             if len(results) >= 20: # Limit results
                 break
     return jsonify(results)
+
+def get_nrc_info(cursor, nrcs):
+    if not nrcs: return []
+    placeholders = ','.join(['?']*len(nrcs))
+    cursor.execute(f"""
+        SELECT NRC, TITULO, LUNES, MARTES, MIERCOLES, JUEVES, VIERNES, SABADO, DOMINGO, HORA_INCIO, HORA_FIN
+        FROM planificacion
+        WHERE NRC IN ({placeholders})
+    """, nrcs)
+    
+    results = []
+    for row in cursor.fetchall():
+        id_malla = get_malla_id_by_name(row['TITULO'])
+        malla_info = MALLA_DATA.get(id_malla) if id_malla else None
+        
+        # Parse schedule
+        schedule = []
+        days = [('LUNES', row['LUNES']), ('MARTES', row['MARTES']), ('MIERCOLES', row['MIERCOLES']), 
+                ('JUEVES', row['JUEVES']), ('VIERNES', row['VIERNES']), ('SABADO', row['SABADO']), ('DOMINGO', row['DOMINGO'])]
+        
+        hi = int(str(row['HORA_INCIO']).replace(':', '')) if row['HORA_INCIO'] else 0
+        hf = int(str(row['HORA_FIN']).replace(':', '')) if row['HORA_FIN'] else 0
+        
+        for day_name, val in days:
+            if val:
+                schedule.append({'day': day_name, 'start': hi, 'end': hf})
+                
+        results.append({
+            'nrc': row['NRC'],
+            'titulo': row['TITULO'],
+            'id_malla': id_malla,
+            'sct': malla_info['sct'] if malla_info else 0,
+            'nivel': malla_info['nivel'] if malla_info else 99,
+            'requisitos': malla_info['requisitos'] if malla_info else [],
+            'schedule': schedule
+        })
+    return results
+
+def check_schedule_conflict(sched1, sched2):
+    for s1 in sched1:
+        for s2 in sched2:
+            if s1['day'] == s2['day']:
+                # overlap if max(start1, start2) < min(end1, end2)
+                if max(s1['start'], s2['start']) < min(s1['end'], s2['end']):
+                    return True
+    return False
+
+@app.route('/api/toma_carga/validar', methods=['POST'])
+def validar_toma_carga():
+    data = request.json
+    rut = data.get('rut')
+    nrcs_to_add = data.get('nrcs', [])
+    token = data.get('smp_token')
+    
+    if not rut or not nrcs_to_add or not token:
+        return jsonify({'success': False, 'message': 'Faltan datos obligatorios (RUT, NRCs o Token).'}), 400
+        
+    # Clean token if user pasted 'Bearer ...' or a full cURL
+    token_clean = token.strip()
+    if token_clean.startswith('Bearer '):
+        token_clean = token_clean[7:].strip()
+    # If they pasted the whole curl command, try to extract the bearer token
+    if 'Bearer ' in token_clean:
+        token_clean = token_clean.split('Bearer ')[1].split("'")[0].split('"')[0].strip()
+        
+    # Remove DV if present
+    rut_clean = rut.split('-')[0].replace('.', '')
+    
+    # 1. Fetch from SMP
+    url = f"https://apismp.uautonoma.cl/estudiantes/avance?pagina=0&registros=100&id={rut_clean}&programa=ICIND_111"
+    headers = {
+        'Accept': '*/*',
+        'Authorization': f'Bearer {token_clean}',
+        'Origin': 'https://smp.uautonoma.cl',
+        'Referer': 'https://smp.uautonoma.cl/',
+        'api': 'GESTIÓN ACADÉMICA',
+        'aplicativo': 'ESTUDIANTE',
+        'codInstitucion': 'UAC',
+        'endpoint': url,
+        'pidmUsuario': '178360',
+        'tipoPeticion': 'GET'
+    }
+    
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        if r.status_code == 401:
+            return jsonify({'success': False, 'message': 'Token de SMP inválido o expirado. Por favor, actualiza tu Token.'}), 401
+        r.raise_for_status()
+        smp_data = r.json()
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error conectando a SMP: {str(e)}'}), 500
+        
+    historial, enrolled_nrcs = parse_avance(smp_data, target_period="202620")
+    
+    # Calculate Nivel Base
+    niveles_completos = []
+    # Group subjects by level
+    niveles = {}
+    for mid, info in MALLA_DATA.items():
+        if info['nivel'] not in niveles:
+            niveles[info['nivel']] = []
+        niveles[info['nivel']].append(mid)
+        
+    nivel_base = 0
+    for lvl in sorted(niveles.keys()):
+        all_passed = all(historial.get(mid, {}).get('aprobado', False) for mid in niveles[lvl])
+        if all_passed:
+            nivel_base = lvl
+        else:
+            break
+            
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Get info for all enrolled and new NRCs
+    enrolled_info = get_nrc_info(cursor, enrolled_nrcs)
+    new_info = get_nrc_info(cursor, nrcs_to_add)
+    
+    conn.close()
+    
+    errors = []
+    
+    # Rule 1: Max 32 SCT
+    total_sct = sum(x['sct'] for x in enrolled_info) + sum(x['sct'] for x in new_info)
+    if total_sct > 32:
+        errors.append(f"Regla 1 Falló: Excede límite de 32 créditos SCT (Total proyectado: {total_sct}).")
+        
+    # Check each new NRC
+    all_schedules = [x['schedule'] for x in enrolled_info]
+    
+    for ni in new_info:
+        # Rule 3: Max Levels (+3 from nivel_base)
+        if ni['nivel'] > nivel_base + 3:
+            errors.append(f"Regla 3 Falló: {ni['titulo']} (Nivel {ni['nivel']}) excede los 3 niveles permitidos (Nivel base actual: {nivel_base}).")
+            
+        # Rule 4: Prerequisites
+        for req_id in ni['requisitos']:
+            if not historial.get(req_id, {}).get('aprobado', False):
+                req_name = MALLA_DATA.get(req_id, {}).get('nombre', req_id)
+                errors.append(f"Regla 4 Falló: {ni['titulo']} requiere aprobar {req_name}.")
+                
+        # Rule 2: Schedule Conflict
+        conflict = False
+        for sched in all_schedules:
+            if check_schedule_conflict(ni['schedule'], sched):
+                conflict = True
+                break
+        
+        if conflict:
+            errors.append(f"Regla 2 Falló: {ni['titulo']} presenta tope de horario con otra asignatura inscrita o propuesta.")
+        else:
+            all_schedules.append(ni['schedule']) # Add to schedule array to check cross-conflicts among new subjects
+            
+    if errors:
+        return jsonify({'success': False, 'errors': errors})
+        
+    return jsonify({'success': True, 'message': 'Validación exitosa.'})
 
 @app.route('/api/toma_carga/asignaturas', methods=['GET'])
 def get_toma_carga_asignaturas():

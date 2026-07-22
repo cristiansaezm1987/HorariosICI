@@ -2653,6 +2653,8 @@ document.getElementById('toma-carga-form')?.addEventListener('submit', async (e)
         comentarios: document.getElementById('tc-comentarios').value
     };
     
+    const token = document.getElementById('tc-smp-token').value;
+    
     if (!data.nombre) {
         showToast('Debe seleccionar un alumno válido de la lista.', 'error');
         return;
@@ -2661,9 +2663,56 @@ document.getElementById('toma-carga-form')?.addEventListener('submit', async (e)
     try {
         const btn = document.getElementById('btn-save-tc');
         const ogText = btn.innerHTML;
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Validando...';
         btn.disabled = true;
         
+        // Split NRCs if there are multiple (e.g., theory + lab)
+        const nrcsList = data.nrc.split(',').map(n => n.trim()).filter(n => n);
+        
+        // 1. Validate rules via API
+        const validRes = await fetch('/api/toma_carga/validar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                rut: data.rut,
+                nrcs: nrcsList,
+                smp_token: token
+            })
+        });
+        
+        if (validRes.status === 401) {
+            btn.innerHTML = ogText;
+            btn.disabled = false;
+            Swal.fire({
+                icon: 'error',
+                title: 'Token Inválido',
+                text: 'El Token de SMP ha expirado o es incorrecto. Por favor vuelve a iniciar sesión en SMP y copia un nuevo token.'
+            });
+            return;
+        }
+        
+        const validData = await validRes.json();
+        
+        if (!validData.success) {
+            btn.innerHTML = ogText;
+            btn.disabled = false;
+            
+            // Build error list
+            const errorListHtml = '<ul style="text-align: left; font-size: 0.9rem;">' + 
+                (validData.errors || [validData.message]).map(e => `<li style="margin-bottom:5px;">${e}</li>`).join('') + 
+                '</ul>';
+                
+            Swal.fire({
+                icon: 'warning',
+                title: 'Inscripción Rechazada',
+                html: `<p>El estudiante no cumple con las reglas de inscripción:</p>${errorListHtml}`,
+                confirmButtonColor: '#f59e0b'
+            });
+            return;
+        }
+        
+        // 2. Save the inscription if validation passed
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
         const res = await fetch('/api/toma_carga', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2674,8 +2723,17 @@ document.getElementById('toma-carga-form')?.addEventListener('submit', async (e)
         btn.disabled = false;
         
         if (res.ok) {
-            showToast('Inscripción registrada correctamente', 'success');
+            Swal.fire({
+                icon: 'success',
+                title: 'Inscripción Registrada',
+                text: 'El estudiante cumple con todos los requisitos y se ha registrado correctamente.',
+                timer: 3000,
+                showConfirmButton: false
+            });
+            // Don't clear token on reset, so user can keep typing
+            const currentToken = document.getElementById('tc-smp-token').value;
             document.getElementById('toma-carga-form').reset();
+            document.getElementById('tc-smp-token').value = currentToken;
             loadTomaCargaTable();
         } else {
             const err = await res.json();
@@ -2683,6 +2741,8 @@ document.getElementById('toma-carga-form')?.addEventListener('submit', async (e)
         }
     } catch (err) {
         showToast('Error de conexión', 'error');
+        document.getElementById('btn-save-tc').innerHTML = '<i class="fa-solid fa-save"></i> Registrar Inscripción';
+        document.getElementById('btn-save-tc').disabled = false;
     }
 });
 
