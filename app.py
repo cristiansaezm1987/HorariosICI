@@ -1372,6 +1372,14 @@ def validar_toma_carga():
     all_schedules = [x['schedule'] for x in enrolled_info]
     
     for ni in new_info:
+        # Rule 5: Already Approved
+        if historial.get(ni['id_malla'], {}).get('aprobado', False):
+            errors.append(f"Regla 5 Falló: {ni['titulo']} ya se encuentra aprobada en el historial del estudiante.")
+            
+        # Rule 6: Already Enrolled
+        if any(x['id_malla'] == ni['id_malla'] for x in enrolled_info):
+            errors.append(f"Regla 6 Falló: {ni['titulo']} ya está inscrita en el periodo actual.")
+            
         # Rule 3: Max Levels (+3 from nivel_base)
         if ni['nivel'] > nivel_base + 3:
             errors.append(f"Regla 3 Falló: {ni['titulo']} (Nivel {ni['nivel']}) excede los 3 niveles permitidos (Nivel base actual: {nivel_base}).")
