@@ -5,7 +5,7 @@ from playwright.async_api import async_playwright
 async def capture_token():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=False)
-        context = await browser.new_context()
+        context = await browser.new_context(ignore_https_errors=True)
         page = await context.new_page()
 
         token_captured = []

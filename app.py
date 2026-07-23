@@ -200,34 +200,48 @@ try:
 except Exception as e:
     print(f"Error loading malla.csv: {e}")
 
-def get_malla_id_by_name(asignatura_name):
-    if not asignatura_name: return None
+def get_malla_ids_by_name(asignatura_name):
+    if not asignatura_name: return []
     parts = asignatura_name.split('-', 1)
     name = parts[1].strip().upper() if len(parts) > 1 else asignatura_name.strip().upper()
     
     name_norm = normalize_text(name)
+    ids = []
     
     ELECTIVE_MAPPING = {
+        'COMUNICACIÓN Y ARGUMENTACIÓN': '10',
         'COMUNICACION EN CONTEXTO': '10',
         'DRLLO. PERSONAL Y PLAN DE VIDA': '32',
-        'RESP SOCIAL UNIV E INNO SOC': '56'
+        'TÉCNIC. MEJORAR EMPLEABILIDAD': '32',
+        'ÉTICA Y DIVERSIDAD : UN DESAFI': '50',
+        'ÉTICA Y DIVERSIDAD : UN DESAFIO': '50',
+        'RESP SOCIAL UNIV E INNO SOC': '56',
+        'EMPREND COMUNIT APORT RESP SOC': '56',
+        'APRENDIZAJE ACTIVO': '5',
+        'DESAFIANDO EL PENSAMIENTO II': '5'
     }
+    
     for k, v in ELECTIVE_MAPPING.items():
         if normalize_text(k) == name_norm:
-            return v
+            target_nombre = normalize_text(MALLA_DATA[v]['nombre'])
+            for id_m, data in MALLA_DATA.items():
+                if normalize_text(data['nombre']) == target_nombre:
+                    ids.append(id_m)
+            return ids
             
     # Exact match first
-    for id, data in MALLA_DATA.items():
+    for id_m, data in MALLA_DATA.items():
         if normalize_text(data['nombre']) == name_norm:
-            return id
+            ids.append(id_m)
+    if ids: return ids
             
     # Fallback to substring
-    for id, data in MALLA_DATA.items():
+    for id_m, data in MALLA_DATA.items():
         data_norm = normalize_text(data['nombre'])
         if name_norm in data_norm or data_norm in name_norm:
-            return id
+            ids.append(id_m)
             
-    return None
+    return ids
 
 import re
 
@@ -239,14 +253,28 @@ def parse_malla_api(json_data):
         for k, v in row.items():
             if k.startswith('nivel') and v:
                 aprobado = '#AP#' in v
+                cursando = '#CU#' in v or '##T' in v
                 parts = v.split('-', 1)
                 if len(parts) == 2:
                     name = parts[1].split('#')[0].strip()
                     # Remove the period suffix if present (e.g., " 202620")
                     name = re.sub(r'\s+\d{6}$', '', name).strip()
-                    id_malla = get_malla_id_by_name(name)
-                    if id_malla:
-                        historial[id_malla] = {'aprobado': aprobado}
+                    id_mallas = get_malla_ids_by_name(name)
+                    if id_mallas:
+                        assigned_id = None
+                        for id_m in id_mallas:
+                            if id_m not in historial:
+                                assigned_id = id_m
+                                break
+                        if not assigned_id:
+                            assigned_id = id_mallas[0]
+                            
+                        id_malla = assigned_id
+                        if id_malla not in historial:
+                            historial[id_malla] = {'aprobado': aprobado, 'cursando': cursando}
+                        else:
+                            historial[id_malla]['aprobado'] = historial[id_malla]['aprobado'] or aprobado
+                            historial[id_malla]['cursando'] = historial[id_malla]['cursando'] or cursando
     
     return historial
 
@@ -306,6 +334,78 @@ def import_csv_to_db(file_path):
 def index():
     return send_from_directory('static', 'index.html')
 
+def transform_df_if_electives(df):
+    import pandas as pd
+    
+    # Normalize columns to upper and strip whitespace for checking
+    col_names = [str(c).upper().strip().replace('\ufeff', '') for c in df.columns]
+    
+    # Check if it looks like the electives CSV format
+    if 'TIPO DE ELECTIVO' in col_names and 'ASIGNATURA' in col_names:
+        # Rename original columns to make it easier
+        df.columns = col_names
+        
+        new_rows = []
+        day_map = {
+            'LUNES': 'LUNES', 'MARTES': 'MARTES', 'MIÉRCOLES': 'MIERCOLES', 'MIERCOLES': 'MIERCOLES',
+            'JUEVES': 'JUEVES', 'VIERNES': 'VIERNES', 'SÁBADO': 'SABADO', 'SABADO': 'SABADO'
+        }
+        
+        for _, row in df.iterrows():
+            carrera_val = str(row.get('CARRERA', '')).strip()
+            if carrera_val.upper() == 'ING. CIVIL INDUSTRIAL':
+                carrera_val = 'ICIN'
+            elif carrera_val.upper() == 'ING. CIVIL INFORMATICA' or carrera_val.upper() == 'ING. CIVIL INFORMÁTICA':
+                carrera_val = 'ICIF'
+                
+            base_info = {
+                'TITULO': str(row.get('ASIGNATURA', '')).strip(),
+                'MATERIA': 'ELECTIVO',
+                'CURSO': '001', # Placeholder if missing
+                'SECCION': '1', # Placeholder if missing
+                'TIPO_HORARIO': str(row.get('TIPO DE ELECTIVO', '')).strip(),
+                'NRC': str(row.get('NRC', '')).strip(),
+                'DOCENTE': str(row.get('DOCENTE', '')).strip(),
+                'CARRERA': carrera_val,
+                'SEDE': str(row.get('SEDE', '')).strip(),
+                'LUNES': '', 'MARTES': '', 'MIERCOLES': '', 'JUEVES': '', 'VIERNES': '', 'SABADO': '',
+                'HORA_INCIO': '', 'HORA_FIN': ''
+            }
+            
+            # Handle float nans
+            if str(base_info['NRC']) == 'nan': base_info['NRC'] = ''
+            if str(base_info['TITULO']) == 'nan': base_info['TITULO'] = ''
+            
+            time_groups = {}
+            for d, h in [('DÍA 1', 'HORARIO 1'), ('DÍA 2', 'HORARIO 2'), ('DIA 1', 'HORARIO 1'), ('DIA 2', 'HORARIO 2')]:
+                day_val = str(row.get(d, '')).strip().upper()
+                time_val = str(row.get(h, '')).strip()
+                if day_val and day_val != 'NAN' and time_val and time_val != 'NAN':
+                    d_key = day_map.get(day_val, day_val)
+                    if time_val not in time_groups:
+                        time_groups[time_val] = []
+                    time_groups[time_val].append(d_key)
+                    
+            if not time_groups:
+                new_rows.append(base_info)
+            else:
+                for time_val, days in time_groups.items():
+                    r = base_info.copy()
+                    for d_key in days:
+                        if d_key in r:
+                            r[d_key] = 'Y'
+                    if '-' in time_val:
+                        parts = time_val.split('-')
+                        if len(parts) == 2:
+                            r['HORA_INCIO'] = parts[0].strip()
+                            r['HORA_FIN'] = parts[1].strip()
+                    new_rows.append(r)
+                    
+        return pd.DataFrame(new_rows)
+    
+    return df
+
+
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
@@ -332,6 +432,7 @@ def upload_file():
                 file.seek(0)
                 df = pd.read_csv(file, sep=None, engine='python', encoding='cp1252')
                 
+            df = transform_df_if_electives(df)
             dfs.append(df)
             
         if not dfs:
@@ -360,49 +461,113 @@ def upload_file():
 
 @app.route('/api/summary', methods=['GET'])
 def get_summary():
+    carrera = request.args.get('carrera', '')
+    
     conn = get_db_connection()
     cursor = conn.cursor()
     
     try:
+        # Build base filter
+        filter_sql = ""
+        params = []
+        if carrera:
+            filter_sql = "WHERE CARRERA = ?"
+            params.append(carrera)
+            
         # Check if table has data
         cursor.execute("SELECT COUNT(*) FROM planificacion")
-        total_rows = cursor.fetchone()[0]
+        total_rows_global = cursor.fetchone()[0]
         
-        if total_rows == 0:
+        if total_rows_global == 0:
             return jsonify({'success': True, 'empty': True})
             
         # Total unique subjects (by NRC) - parent TEO NRCs only
-        cursor.execute("SELECT COUNT(DISTINCT NRC) FROM planificacion WHERE TIPO_HORARIO = 'TEO' AND (NRC_PADRE IS NULL OR TRIM(NRC_PADRE) = '')")
+        cursor.execute(f"SELECT COUNT(DISTINCT NRC) FROM planificacion {filter_sql + (' AND ' if carrera else 'WHERE ')}TIPO_HORARIO = 'TEO' AND (NRC_PADRE IS NULL OR TRIM(NRC_PADRE) = '')", params)
         total_nrcs = cursor.fetchone()[0]
         
         # Total unique Docentes
-        cursor.execute("SELECT COUNT(DISTINCT DOCENTE) FROM planificacion WHERE DOCENTE IS NOT NULL AND DOCENTE != ''")
+        cursor.execute(f"SELECT COUNT(DISTINCT DOCENTE) FROM planificacion {filter_sql + (' AND ' if carrera else 'WHERE ')}DOCENTE IS NOT NULL AND DOCENTE != ''", params)
         total_docentes = cursor.fetchone()[0]
         
         # Total unique Rooms
-        cursor.execute("SELECT COUNT(DISTINCT COD_SALON) FROM planificacion WHERE COD_SALON IS NOT NULL AND COD_SALON != ''")
+        cursor.execute(f"SELECT COUNT(DISTINCT COD_SALON) FROM planificacion {filter_sql + (' AND ' if carrera else 'WHERE ')}COD_SALON IS NOT NULL AND COD_SALON != ''", params)
         total_salas = cursor.fetchone()[0]
         
         # Total unique Levels
-        cursor.execute("SELECT COUNT(DISTINCT NIVEL) FROM planificacion WHERE NIVEL IS NOT NULL")
+        cursor.execute(f"SELECT COUNT(DISTINCT NIVEL) FROM planificacion {filter_sql + (' AND ' if carrera else 'WHERE ')}NIVEL IS NOT NULL", params)
         total_niveles = cursor.fetchone()[0]
         
         # Total cupos, inscritos, disponibles (using distinct NRCs to avoid double counting)
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT SUM(CUPO), SUM(INSCRITOS), SUM(DISPONIBLES) 
             FROM (
                 SELECT NRC, CUPO, INSCRITOS, DISPONIBLES 
                 FROM planificacion 
+                {filter_sql}
                 GROUP BY NRC
             )
-        """)
+        """, params)
         sum_row = cursor.fetchone()
         total_cupos = sum_row[0] or 0
         total_inscritos = sum_row[1] or 0
         total_disponibles = sum_row[2] or 0
         
+        # Cupos por asignatura, sección y tipo (TEO, LAB, AYU)
+        cursor.execute(f"""
+            SELECT NRC, TITULO, SECCION, TIPO_HORARIO, CUPO as cupo, INSCRITOS as inscritos, DISPONIBLES as disponibles
+            FROM planificacion 
+            {filter_sql}
+            GROUP BY NRC, TITULO, SECCION, TIPO_HORARIO, CUPO, INSCRITOS, DISPONIBLES
+            ORDER BY TITULO, SECCION, TIPO_HORARIO
+        """, params)
+        base_cupos = [dict(row) for row in cursor.fetchall()]
+        
+        # Now get the schedule for these NRCs
+        if base_cupos:
+            nrcs = [str(r['NRC']) for r in base_cupos if r['NRC']]
+            if nrcs:
+                # We can do this with a direct query
+                # But since nrcs can be up to ~1000, sqlite might have a limit on variables.
+                # So we just fetch all schedules matching the filter and map them
+                cursor.execute(f"""
+                    SELECT NRC, LUNES, MARTES, MIERCOLES, JUEVES, VIERNES, SABADO, DOMINGO, HORA_INCIO, HORA_FIN
+                    FROM planificacion
+                    {filter_sql}
+                """, params)
+                
+                horarios_by_nrc = {}
+                for row in cursor.fetchall():
+                    nrc = str(row['NRC'])
+                    if nrc not in horarios_by_nrc:
+                        horarios_by_nrc[nrc] = []
+                    days = []
+                    if row['LUNES'] == 'Y': days.append('L')
+                    if row['MARTES'] == 'Y': days.append('M')
+                    if row['MIERCOLES'] == 'Y': days.append('W')
+                    if row['JUEVES'] == 'Y': days.append('J')
+                    if row['VIERNES'] == 'Y': days.append('V')
+                    if row['SABADO'] == 'Y': days.append('S')
+                    if row['DOMINGO'] == 'Y': days.append('D')
+                    
+                    if days and row['HORA_INCIO'] and row['HORA_FIN']:
+                        hi = str(row['HORA_INCIO'])
+                        hf = str(row['HORA_FIN'])
+                        if len(hi) == 4 and ':' not in hi: hi = f"{hi[:2]}:{hi[2:]}"
+                        elif len(hi) == 3 and ':' not in hi: hi = f"0{hi[0]}:{hi[1:]}"
+                        if len(hf) == 4 and ':' not in hf: hf = f"{hf[:2]}:{hf[2:]}"
+                        elif len(hf) == 3 and ':' not in hf: hf = f"0{hf[0]}:{hf[1:]}"
+                        
+                        horario_str = f"{'-'.join(days)} {hi}-{hf}"
+                        if horario_str not in horarios_by_nrc[nrc]:
+                            horarios_by_nrc[nrc].append(horario_str)
+                
+                for c in base_cupos:
+                    c['horario'] = " | ".join(horarios_by_nrc.get(str(c['NRC']), []))
+            
+        cupos_por_asignatura = base_cupos
+        
         # Total academic hours (sum of weekly blocks for distinct NRCs) - excluding APM
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT SUM(weekly_blocks) FROM (
                 SELECT NRC,
                        (SUM(CASE WHEN LUNES='Y' THEN 1 ELSE 0 END) +
@@ -413,14 +578,14 @@ def get_summary():
                         SUM(CASE WHEN SABADO='Y' THEN 1 ELSE 0 END) +
                         SUM(CASE WHEN DOMINGO='Y' THEN 1 ELSE 0 END)) as weekly_blocks
                 FROM planificacion 
-                WHERE TIPO_HORARIO != 'APM' AND HORA_INCIO IS NOT NULL AND HORA_INCIO != ''
+                {filter_sql + (' AND ' if carrera else 'WHERE ')}TIPO_HORARIO != 'APM' AND HORA_INCIO IS NOT NULL AND HORA_INCIO != ''
                 GROUP BY NRC
             )
-        """)
+        """, params)
         total_horas = cursor.fetchone()[0] or 0
         
         # Hours breakdown by type (parent NRCs only, excluding APM, using weekly blocks)
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT TIPO_HORARIO, SUM(weekly_blocks) as horas
             FROM (
                 SELECT NRC, TIPO_HORARIO,
@@ -432,12 +597,12 @@ def get_summary():
                         SUM(CASE WHEN SABADO='Y' THEN 1 ELSE 0 END) +
                         SUM(CASE WHEN DOMINGO='Y' THEN 1 ELSE 0 END)) as weekly_blocks
                 FROM planificacion
-                WHERE TIPO_HORARIO != 'APM' AND HORA_INCIO IS NOT NULL AND HORA_INCIO != ''
+                {filter_sql + (' AND ' if carrera else 'WHERE ')}TIPO_HORARIO != 'APM' AND HORA_INCIO IS NOT NULL AND HORA_INCIO != ''
                 GROUP BY NRC, TIPO_HORARIO
             )
             GROUP BY TIPO_HORARIO
             ORDER BY TIPO_HORARIO
-        """)
+        """, params)
         horas_por_tipo = {row['TIPO_HORARIO']: (row['horas'] or 0) for row in cursor.fetchall()}
         
         # NRC padre count by type (parent NRCs only = those with no NRC_PADRE, excluding APM)
@@ -519,7 +684,8 @@ def get_summary():
             'edificios': edificios,
             'contratos': contratos,
             'jerarquias': jerarquias,
-            'grados': grados
+            'grados': grados,
+            'cupos_por_asignatura': cupos_por_asignatura
         })
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -1231,7 +1397,9 @@ def search_alumnos():
         if rut_query in str(a.get('ID_BANNER', '')).lower():
             results.append({
                 'rut': a.get('ID_BANNER', ''),
-                'nombre': f"{a.get('NOMBRES', '')} {a.get('APELLIDOS', '')}".strip()
+                'nombre': f"{a.get('NOMBRES', '')} {a.get('APELLIDOS', '')}".strip(),
+                'carrera': a.get('PROGRAMA', ''),
+                'correo': a.get('CORREO_CLOUD', '')
             })
             if len(results) >= 20: # Limit results
                 break
@@ -1249,7 +1417,8 @@ def get_nrc_info(cursor, nrcs):
     results_dict = {}
     for row in cursor.fetchall():
         nrc = row['NRC']
-        id_malla = get_malla_id_by_name(row['TITULO'])
+        id_mallas = get_malla_ids_by_name(row['TITULO'])
+        id_malla = id_mallas[0] if id_mallas else None
         malla_info = MALLA_DATA.get(id_malla) if id_malla else None
         
         hi = int(str(row['HORA_INCIO']).replace(':', '')) if row['HORA_INCIO'] else 0
@@ -1328,7 +1497,7 @@ def validar_toma_carga():
         if r.status_code == 401:
             return jsonify({'success': False, 'message': 'Token de SMP inválido o expirado. Por favor, actualiza tu Token.'}), 401
         r.raise_for_status()
-        smp_data = r.json()
+        smp_data = r.json(); import json; json.dump(smp_data, open('smp_malla_dump.json', 'w', encoding='utf-8'))
         
         # 2. Fetch from SMP (horario)
         url_horario = f"https://apismp.uautonoma.cl/estudiantes/horario?pagina=0&registros=1000000&id={rut_clean}&periodo=202620"
@@ -1372,48 +1541,86 @@ def validar_toma_carga():
     conn.close()
     
     errors = []
+    warnings = []
     
-    # Rule 1: Max 32 SCT
-    total_sct = sum(x['sct'] for x in enrolled_info) + sum(x['sct'] for x in new_info)
-    if total_sct > 32:
-        errors.append(f"Regla 1 Falló: Excede límite de 32 créditos SCT (Total proyectado: {total_sct}).")
-        
     # Check each new NRC
     all_schedules = [x['schedule'] for x in enrolled_info]
+    
+    # Identify currently enrolled IDs from historial and horario
+    enrolled_malla_ids = set()
+    for id_m, estado in historial.items():
+        if estado.get('cursando'):
+            enrolled_malla_ids.add(id_m)
+            
+    for ei in enrolled_info:
+        if ei['id_malla']:
+            enrolled_malla_ids.add(ei['id_malla'])
+            
+    # Calculate SCT from enrolled_malla_ids using MALLA_DATA directly
+    sct_actual = sum(MALLA_DATA[mid]['sct'] for mid in enrolled_malla_ids if mid in MALLA_DATA)
+    
+    added_sct = 0
+    seen_malla = set()
+    for x in new_info:
+        k = x['id_malla'] or x['titulo'].strip().upper()
+        if k not in seen_malla:
+            seen_malla.add(k)
+            added_sct += x['sct']
+            
+    total_sct = sct_actual + added_sct
+    
+    if total_sct > 32:
+        warnings.append(f"Regla 1 (SCT): Excede límite de 32 créditos SCT (Total proyectado: {total_sct}).")
     
     for ni in new_info:
         # Rule 5: Already Approved
         if ni['id_malla'] and historial.get(ni['id_malla'], {}).get('aprobado', False):
-            errors.append(f"Regla 5 Falló: {ni['titulo']} ya se encuentra aprobada en el historial del estudiante.")
+            warnings.append(f"Regla 5 (Historial): {ni['titulo']} ya se encuentra aprobada en el historial del estudiante.")
             
         # Rule 6: Already Enrolled
-        if ni['id_malla'] and any((x['id_malla'] == ni['id_malla']) for x in enrolled_info):
-            errors.append(f"Regla 6 Falló: {ni['titulo']} ya está inscrita en el periodo actual.")
+        if ni['id_malla'] and (ni['id_malla'] in enrolled_malla_ids):
+            warnings.append(f"Regla 6 (Inscripción): {ni['titulo']} ya está inscrita en el periodo actual.")
             
         # Rule 3: Max Levels (+3 from nivel_base)
         if ni['nivel'] > nivel_base + 3:
-            errors.append(f"Regla 3 Falló: {ni['titulo']} (Nivel {ni['nivel']}) excede los 3 niveles permitidos (Nivel base actual: {nivel_base}).")
+            warnings.append(f"Tope de Niveles: {ni['titulo']} (Nivel {ni['nivel']}) excede los 3 niveles permitidos (Nivel base actual: {nivel_base}).")
             
         # Rule 4: Prerequisites
+        missing_prereqs = []
         for req_id in ni['requisitos']:
             if not historial.get(req_id, {}).get('aprobado', False):
-                req_name = MALLA_DATA.get(req_id, {}).get('nombre', req_id)
-                errors.append(f"Regla 4 Falló: {ni['titulo']} requiere aprobar {req_name}.")
+                missing_prereqs.append(req_id)
+                
+        if missing_prereqs:
+            last_req_id = missing_prereqs[-1]
+            req_name = MALLA_DATA.get(last_req_id, {}).get('nombre', last_req_id)
+            warnings.append(f"Pre-requisito faltante: {ni['titulo']} requiere aprobar {req_name}.")
                 
         # Rule 2: Schedule Conflict
         conflict = False
+        conflict_with = None
         for sched in all_schedules:
             if check_schedule_conflict(ni['schedule'], sched):
                 conflict = True
+                for s1 in ni['schedule']:
+                    for s2 in sched:
+                        if s1['day'] == s2['day'] and max(s1['start'], s2['start']) < min(s1['end'], s2['end']):
+                            conflict_with = s2.get('titulo', 'Desconocido')
+                            break
+                    if conflict_with:
+                        break
                 break
         
         if conflict:
-            errors.append(f"Regla 2 Falló: {ni['titulo']} presenta tope de horario con otra asignatura inscrita o propuesta.")
+            warnings.append(f"Tope de Horario: {ni['titulo']} presenta tope de horario con '{conflict_with}'.")
         else:
             all_schedules.append(ni['schedule']) # Add to schedule array to check cross-conflicts among new subjects
             
-    if errors:
-        return jsonify({'success': False, 'errors': errors})
+    warnings = list(dict.fromkeys(warnings))
+    errors = list(dict.fromkeys(errors))
+            
+    if errors or warnings:
+        return jsonify({'success': False, 'errors': errors, 'warnings': warnings})
         
     return jsonify({'success': True, 'message': 'Validación exitosa.'})
 
@@ -1453,13 +1660,16 @@ def posibles_toma_carga():
         if r.status_code == 401:
             return jsonify({'success': False, 'message': 'Token de SMP inválido o expirado. Por favor, actualiza tu Token.'}), 401
         r.raise_for_status()
-        smp_data = r.json()
+        smp_data = r.json(); import json; json.dump(smp_data, open('smp_malla_dump.json', 'w', encoding='utf-8'))
         
         url_horario = f"https://apismp.uautonoma.cl/estudiantes/horario?pagina=0&registros=1000000&id={rut_clean}&periodo=202620"
         headers['endpoint'] = url_horario
         r_horario = requests.get(url_horario, headers=headers, timeout=10)
         r_horario.raise_for_status()
         smp_horario = r_horario.json()
+        import json
+        with open('smp_horario_dump.json', 'w') as f:
+            json.dump(smp_horario, f)
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error conectando a SMP: {str(e)}'}), 500
         
@@ -1490,7 +1700,17 @@ def posibles_toma_carga():
         else:
             break
             
-    sct_actual = sum(x['sct'] for x in enrolled_info)
+    # Calculate currently enrolled IDs bypassing planificacion to guarantee accurate SCT sum
+    enrolled_malla_ids = set()
+    for id_m, estado in historial.items():
+        if estado.get('cursando'):
+            enrolled_malla_ids.add(id_m)
+            
+    for ei in enrolled_info:
+        if ei['id_malla']:
+            enrolled_malla_ids.add(ei['id_malla'])
+            
+    sct_actual = sum(MALLA_DATA[mid]['sct'] for mid in enrolled_malla_ids if mid in MALLA_DATA)
     all_schedules = [x['schedule'] for x in enrolled_info]
     
     # Get all distinct NRCs from database
@@ -1514,7 +1734,7 @@ def posibles_toma_carga():
             continue
             
         # Rule 6: Already Enrolled
-        if ni['id_malla'] and any((x['id_malla'] == ni['id_malla']) for x in enrolled_info):
+        if ni['id_malla'] and (ni['id_malla'] in enrolled_malla_ids):
             continue
             
         # Rule 3: Max Levels (+3 from nivel_base)
@@ -1565,18 +1785,21 @@ def posibles_toma_carga():
             'id_malla': ni['id_malla']
         })
         
-    # Group by titulo
+    # Group by id_malla to avoid duplicates like 'ÁLGEBRA' vs 'ÁLGEBRA '
     agrupados = {}
     for p in posibles:
-        if p['titulo'] not in agrupados:
-            agrupados[p['titulo']] = {'titulo': p['titulo'], 'nivel': p['nivel'], 'sct': p['sct'], 'nrcs': []}
-        agrupados[p['titulo']]['nrcs'].append(p['nrc'])
+        k = p['id_malla'] or p['titulo'].strip().upper()
+        if k not in agrupados:
+            agrupados[k] = {'titulo': p['titulo'].strip(), 'nivel': p['nivel'], 'sct': p['sct'], 'nrcs': set()}
+        agrupados[k]['nrcs'].add(p['nrc'])
+        
+    for k in agrupados:
+        agrupados[k]['nrcs'] = list(agrupados[k]['nrcs'])
         
     resultados_finales = sorted(list(agrupados.values()), key=lambda x: x['nivel'])
     
     # --- Generate Malla Visual Data ---
     malla_visual = {}
-    enrolled_malla_ids = set([x['id_malla'] for x in enrolled_info if x['id_malla']])
     sugeridos_malla_ids = set([p['id_malla'] for p in posibles if p['id_malla']])
     
     for id_malla, data in MALLA_DATA.items():
@@ -1602,7 +1825,8 @@ def posibles_toma_carga():
             'nombre': data['nombre'],
             'sct': data['sct'],
             'estado': estado,
-            'motivo_bloqueo': motivo_bloqueo
+            'motivo_bloqueo': motivo_bloqueo,
+            'requisitos': data['requisitos']
         })
         
     return jsonify({
@@ -1619,7 +1843,8 @@ def get_toma_carga_asignaturas():
     try:
         conn = get_db_connection()
         query = '''
-            SELECT MATERIA, CURSO, TITULO, NRC, NRC_PADRE, TIPO_HORARIO, SECCION
+            SELECT MATERIA, CURSO, TITULO, NRC, NRC_PADRE, TIPO_HORARIO, SECCION,
+                   LUNES, MARTES, MIERCOLES, JUEVES, VIERNES, SABADO, HORA_INCIO, HORA_FIN, DOCENTE
             FROM planificacion
             WHERE 1=1
         '''
@@ -1656,13 +1881,122 @@ def get_toma_carga_asignaturas():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
+
+@app.route('/api/alumnos/horario', methods=['GET'])
+def get_alumno_horario():
+    rut = request.args.get('rut')
+    token = request.args.get('token', '')
+    
+    if not rut:
+        return jsonify({'success': False, 'message': 'RUT requerido.'}), 400
+        
+    rut_clean = rut.split('-')[0].replace('.', '')
+    token_clean = token.strip() if token else ''
+    if token_clean.startswith('Bearer '):
+        token_clean = token_clean[7:].strip()
+        
+    smp_nrcs = []
+    
+    if token_clean:
+        url = f"https://apismp.uautonoma.cl/estudiantes/horario?pagina=0&registros=1000000&id={rut_clean}&periodo=202620"
+        headers = {
+            'Accept': '*/*',
+            'Authorization': f'Bearer {token_clean}',
+            'Origin': 'https://smp.uautonoma.cl',
+            'Referer': 'https://smp.uautonoma.cl/',
+            'api': 'GESTIÓN ACADÉMICA',
+            'aplicativo': 'ESTUDIANTE',
+            'codInstitucion': 'UAC',
+            'endpoint': url,
+        }
+        try:
+            import urllib.request, json
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=5) as response:
+                smp_data = json.loads(response.read().decode())
+                if smp_data and 'data' in smp_data and isinstance(smp_data['data'], list):
+                    for asig in smp_data['data']:
+                        nrc_smp = asig.get('nrc')
+                        if nrc_smp:
+                            smp_nrcs.append(str(nrc_smp).strip())
+        except Exception as e:
+            print(f"Error fetching SMP schedule for {rut_clean}: {e}")
+        
+    manual_nrcs = []
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT nrc FROM toma_carga_manual WHERE rut LIKE ?", (f"{rut_clean}%",))
+        for r in cursor.fetchall():
+            for n in r['nrc'].split(','):
+                if n.strip():
+                    manual_nrcs.append(n.strip())
+        conn.close()
+    except Exception as e:
+        print(f"Error fetching manual schedule for {rut_clean}: {e}")
+        
+    preview_nrc = request.args.get('preview_nrc')
+    if preview_nrc:
+        manual_nrcs.append(str(preview_nrc).strip())
+        
+    all_nrcs = list(set(smp_nrcs + manual_nrcs))
+    
+    combined_schedule = []
+    
+    if all_nrcs:
+        try:
+            conn_plan = sqlite3.connect('planificacion.db')
+            conn_plan.row_factory = sqlite3.Row
+            cursor_plan = conn_plan.cursor()
+            
+            for nrc in all_nrcs:
+                cursor_plan.execute("SELECT * FROM planificacion WHERE NRC = ?", (nrc,))
+                rows = cursor_plan.fetchall()
+                for row in rows:
+                    r_dict = dict(row)
+                    r_dict['origen'] = 'SMP' if nrc in smp_nrcs else 'MANUAL'
+                    # renderTimetable expects 'Y' in LUNES etc, and HORA_INCIO/HORA_FIN
+                    # Wait, planificacion has LUNES='Y' and HORA_INCIO='08:00' HORA_FIN='10:00'
+                    combined_schedule.append(r_dict)
+            conn_plan.close()
+        except Exception as e:
+            print(f"Error checking planificacion: {e}")
+            
+    return jsonify({'success': True, 'schedule': combined_schedule})
+
 @app.route('/api/toma_carga', methods=['GET', 'POST'])
 def handle_toma_carga():
     if request.method == 'GET':
         try:
             conn = get_db_connection()
             cursor = conn.execute('SELECT * FROM toma_carga_manual ORDER BY id DESC')
-            rows = [dict(r) for r in cursor.fetchall()]
+            
+            rows = []
+            conn_plan = sqlite3.connect('planificacion.db')
+            conn_plan.row_factory = sqlite3.Row
+            cursor_plan = conn_plan.cursor()
+            
+            for r in cursor.fetchall():
+                row = dict(r)
+                row['carrera'] = row.get('carrera') or ''
+                row['materia'] = ''
+                row['curso'] = ''
+                row['titulo_asig'] = ''
+                
+                nrcs = [n.strip() for n in row.get('nrc', '').split(',')]
+                if nrcs and nrcs[0]:
+                    cursor_plan.execute('SELECT CODIGO_PROGRAMA, MATERIA, CURSO, TITULO FROM planificacion WHERE NRC = ? LIMIT 1', (nrcs[0],))
+                    p_info = cursor_plan.fetchone()
+                    if p_info:
+                        if not row['carrera']:
+                            row['carrera'] = p_info['CODIGO_PROGRAMA'].split('_')[0] if p_info['CODIGO_PROGRAMA'] else ''
+                        row['materia'] = p_info['MATERIA']
+                        row['curso'] = p_info['CURSO']
+                        row['titulo_asig'] = p_info['TITULO']
+                rows.append(row)
+                
+            conn_plan.close()
             conn.close()
             return jsonify(rows)
         except Exception as e:
@@ -1675,16 +2009,31 @@ def handle_toma_carga():
             
         try:
             conn = get_db_connection()
+            from datetime import datetime
+            now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            # Find the actual student career from alumnos.csv
+            carrera_estudiante = data.get('carrera', '')
+            if not carrera_estudiante:
+                rut_clean = str(data.get('rut', '')).split('-')[0].replace('.', '')
+                alumnos = get_alumnos_data()
+                for a in alumnos:
+                    if str(a.get('ID_BANNER', '')).split('-')[0] == rut_clean:
+                        carrera_estudiante = a.get('PROGRAMA', '')
+                        break
+            
             conn.execute('''
-                INSERT INTO toma_carga_manual (rut, nombre, asignatura, nrc, tipo, comentarios)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO toma_carga_manual (rut, nombre, asignatura, nrc, tipo, comentarios, fecha_registro, carrera)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 data.get('rut', ''),
                 data.get('nombre', ''),
                 data.get('asignatura', ''),
                 data.get('nrc', ''),
                 data.get('tipo', ''),
-                data.get('comentarios', '')
+                data.get('comentarios', ''),
+                now_str,
+                carrera_estudiante
             ))
             conn.commit()
             conn.close()
@@ -1702,6 +2051,58 @@ def delete_toma_carga(record_id):
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/smp/auto-login', methods=['POST'])
+def auto_login():
+    return jsonify({'success': False, 'message': 'Este método fue deshabilitado. Usa el Marcador Mágico.'}), 400
+
+# Variable global para guardar el token del bookmarklet temporalmente
+token_magico = None
+
+@app.route('/api/save_token', methods=['GET'])
+def save_token():
+    global token_magico
+    token = request.args.get('token')
+    if token:
+        token_magico = token
+        return f"""
+        <html>
+            <head>
+                <title>Token Capturado</title>
+                <style>
+                    body {{ font-family: 'Inter', sans-serif; background: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }}
+                    .box {{ background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; border-top: 5px solid #10b981; }}
+                    h1 {{ color: #10b981; margin-top: 0; }}
+                    p {{ color: #475569; font-size: 1.1rem; }}
+                    button {{ background: #3b82f6; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-size: 1rem; cursor: pointer; margin-top: 20px; }}
+                </style>
+            </head>
+            <body>
+                <div class="box">
+                    <h1>¡Token Capturado con Éxito!</h1>
+                    <p>El Marcador Mágico ha enviado el token a tu plataforma.</p>
+                    <p>Puedes cerrar esta pestaña y volver a la aplicación.</p>
+                    <button onclick="window.close(); window.location.href='/'">Volver a la App</button>
+                </div>
+                <script>
+                    setTimeout(() => {{
+                        if (window.opener) {{ window.close(); }}
+                        else {{ window.location.href = '/'; }}
+                    }}, 3000);
+                </script>
+            </body>
+        </html>
+        """
+    return "No token provided", 400
+
+@app.route('/api/get_token', methods=['GET'])
+def get_token():
+    global token_magico
+    if token_magico:
+        t = token_magico
+        token_magico = None # Consume it
+        return jsonify({'success': True, 'token': t})
+    return jsonify({'success': False})
 
 @app.route('/api/smp/auto-login', methods=['POST'])
 def auto_login_smp():

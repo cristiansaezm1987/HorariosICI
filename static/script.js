@@ -62,8 +62,8 @@ const WEEKDAYS = [
 // Helper to check if a class session overlaps with a schedule block
 function isSessionInBlock(session, block) {
     if (!session.HORA_INCIO || !session.HORA_FIN) return false;
-    const sStart = parseInt(session.HORA_INCIO);
-    const sEnd = parseInt(session.HORA_FIN);
+    const sStart = parseInt(String(session.HORA_INCIO).replace(':', ''));
+    const sEnd = parseInt(String(session.HORA_FIN).replace(':', ''));
     const [bStart, bEnd] = block.range;
     return Math.max(sStart, bStart) < Math.min(sEnd, bEnd);
 }
@@ -129,7 +129,59 @@ document.addEventListener('DOMContentLoaded', () => {
     // Restore sidebar stateners();
     setupEventListeners();
     initApp();
+    
+    // Start token polling for bookmarklet
+    setInterval(checkCapturedToken, 2000);
 });
+
+async function checkCapturedToken() {
+    try {
+        const res = await fetch('/api/get_token');
+        const data = await res.json();
+        if (data.success && data.token) {
+            const token = data.token.startsWith('Bearer ') ? data.token : 'Bearer ' + data.token;
+            const tcToken = document.getElementById('tc-smp-token');
+            const mvToken = document.getElementById('mv-token');
+            if (tcToken) tcToken.value = token;
+            if (mvToken) mvToken.value = token;
+            localStorage.setItem('smp_auto_token', token);
+            Swal.fire({
+                icon: 'success',
+                title: '¡Token Mágico Recibido!',
+                text: 'El Marcador Mágico ha transferido exitosamente el token.',
+                timer: 3000,
+                showConfirmButton: false
+            });
+        }
+    } catch (e) {
+        // silently fail polling
+    }
+}
+
+window.showBookmarkletGuide = function() {
+    const bookmarkletCode = `javascript:(function(){try{var e=null;function t(e){for(var t=0;t<e.length;t++){var r=e.getItem(e.key(t));if(r&&"string"==typeof r){if(r.startsWith("eyJ")&&3===r.split(".").length)return r;if(r.includes('"eyJ')){var o=r.match(/"(eyJ[^"]+)"/);if(o&&3===o[1].split(".").length)return o[1]}}}return null}if(e=t(localStorage)||t(sessionStorage)){alert("¡Token encontrado! Redirigiendo a tu plataforma...");window.location.href="${window.location.origin}/api/save_token?token="+encodeURIComponent("Bearer "+e)}else{alert("Modo de Búsqueda Profunda activado.\\n\\nPor favor, haz clic en el menú 'Gestión Académica' o cualquier otra opción en esta misma página para que podamos capturar el token cuando pase por la red.");var r=XMLHttpRequest.prototype.setRequestHeader;XMLHttpRequest.prototype.setRequestHeader=function(e,t){return"authorization"===e.toLowerCase()&&t.startsWith("Bearer ")&&(window.location.href="${window.location.origin}/api/save_token?token="+encodeURIComponent(t)),r.apply(this,arguments)};var o=window.fetch;window.fetch=function(){var e=arguments[1]&&arguments[1].headers&&(arguments[1].headers.Authorization||arguments[1].headers.authorization);return e&&e.startsWith("Bearer ")&&(window.location.href="${window.location.origin}/api/save_token?token="+encodeURIComponent(e)),o.apply(this,arguments)}}}catch(err){alert("Error en el Marcador Mágico: "+err.message)}})();`;
+    
+    Swal.fire({
+        title: '🪄 El Marcador Mágico',
+        html: `
+            <div style="text-align: left; font-size: 0.95rem; line-height: 1.5;">
+                <p>Arrastra el siguiente botón hacia la <b>Barra de Favoritos</b> (o Marcadores) de tu navegador Chrome o Edge:</p>
+                <div style="text-align: center; margin: 20px 0;">
+                    <a href="${bookmarkletCode.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}" style="background: #10b981; color: white; padding: 10px 20px; border-radius: 20px; text-decoration: none; font-weight: bold; cursor: move; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"><i class="fa-solid fa-wand-magic-sparkles"></i> Capturar Token SMP</a>
+                </div>
+                <p><b>¿Cómo se usa?</b></p>
+                <ol>
+                    <li>Ve a la página normal de SMP e inicia sesión.</li>
+                    <li>Una vez dentro, haz clic en el favorito <b>"Capturar Token SMP"</b> que acabas de guardar.</li>
+                    <li>¡Listo! El token volará mágicamente hacia aquí.</li>
+                </ol>
+            </div>
+        `,
+        width: '600px',
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#3b82f6'
+    });
+};
 
 function initApp() {
     checkAuth();
@@ -629,6 +681,9 @@ function setupEventListeners() {
     // EMAIL DOCENTE
     document.getElementById('btn-email-docente')?.addEventListener('click', sendScheduleEmail);
     document.getElementById('btn-email-programas')?.addEventListener('click', sendProgramasEmail);
+    
+    // EMAIL ALUMNO
+    document.getElementById('btn-email-alumno')?.addEventListener('click', sendStudentScheduleEmail);
 }
 
 // --- FILE UPLOAD LOGIC ---
@@ -719,6 +774,11 @@ function switchTab(tabName) {
         if (tcAsignaturas.length === 0) {
             initTomaCarga();
         }
+    } else if (tabName === 'malla-visual') {
+        // Redraw lines because container was hidden (display:none) and coordinates were 0
+        setTimeout(() => {
+            drawPrerequisiteLines();
+        }, 50);
     }
 }
 
@@ -729,6 +789,7 @@ function refreshActiveTab() {
 // --- POPULATE SELECT FILTERS ---
 function loadGlobalFilters() {
     const url = new URL('/api/filters', window.location.origin);
+    url.searchParams.append('_t', Date.now());
     if (globalFilters.carrera) url.searchParams.append('carrera', globalFilters.carrera);
     if (globalFilters.jornada) url.searchParams.append('jornada', globalFilters.jornada);
     
@@ -800,7 +861,12 @@ function loadGlobalFilters() {
 
 // --- TAB 1: DASHBOARD ---
 function loadDashboard() {
-    fetch('/api/summary?_t=' + Date.now())
+    let url = '/api/summary?_t=' + Date.now();
+    if (globalFilters.carrera) {
+        url += '&carrera=' + encodeURIComponent(globalFilters.carrera);
+    }
+    
+    fetch(url)
         .then(res => res.json())
         .then(data => {
             if (data.success && !data.empty) {
@@ -821,6 +887,39 @@ function loadDashboard() {
                 document.getElementById('val-total-disponibles').textContent = disponibles;
                 document.getElementById('matricula-percentage').textContent = `${percent}% de ocupación de cupos`;
                 document.getElementById('matricula-progress-fill').style.width = `${percent}%`;
+                
+                // Populate Cupos por Asignatura Table
+                const tbody = document.querySelector('#table-cupos-asignatura tbody');
+                if (tbody && data.cupos_por_asignatura) {
+                    tbody.innerHTML = '';
+                    data.cupos_por_asignatura.forEach(item => {
+                        const tr = document.createElement('tr');
+                        const p = item.cupo > 0 ? Math.round((item.inscritos / item.cupo) * 100) : 0;
+                        let color = '#10b981';
+                        if (p >= 100) color = '#ef4444';
+                        else if (p >= 80) color = '#f59e0b';
+                        
+                        tr.innerHTML = `
+                            <td style="text-align: center; font-weight: bold;">${item.NRC || '-'}</td>
+                            <td style="text-align: left; font-weight: 500;">${item.TITULO}</td>
+                            <td style="text-align: center;">${item.SECCION || '-'}</td>
+                            <td style="text-align: center;"><span class="badge-type ${item.TIPO_HORARIO ? item.TIPO_HORARIO.toLowerCase() : 'teo'}">${item.TIPO_HORARIO || 'TEO'}</span></td>
+                            <td style="text-align: left; font-size: 0.85rem; color: #475569;">${item.horario || '-'}</td>
+                            <td style="text-align: right;">${item.cupo}</td>
+                            <td style="text-align: right;">${item.inscritos}</td>
+                            <td style="text-align: right; font-weight: bold; color: ${item.disponibles <= 0 ? '#ef4444' : 'inherit'};">${item.disponibles}</td>
+                            <td style="text-align: center;">
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 5px;">
+                                    <div style="width: 50px; background: #e2e8f0; height: 6px; border-radius: 3px; overflow: hidden;">
+                                        <div style="width: ${Math.min(p, 100)}%; background: ${color}; height: 100%;"></div>
+                                    </div>
+                                    <span style="font-size: 0.8rem; color: ${color}; font-weight: 600;">${p}%</span>
+                                </div>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
 
                 const typeNames = {
                     'TEO': 'Teoría / Cátedra',
@@ -971,6 +1070,7 @@ function loadDashboard() {
 // --- TAB 2: ASIGNATURAS ---
 function loadAsignaturas() {
     const url = new URL('/api/asignaturas', window.location.origin);
+    url.searchParams.append('_t', Date.now());
     if (globalFilters.carrera) url.searchParams.append('carrera', globalFilters.carrera);
     if (globalFilters.jornada) url.searchParams.append('jornada', globalFilters.jornada);
     
@@ -1136,6 +1236,7 @@ function navigateToDocente(nombre) {
     const targetName = nombre.trim();
 
     const url = new URL('/api/docentes', window.location.origin);
+    url.searchParams.append('_t', Date.now());
     if (globalFilters.carrera) url.searchParams.append('carrera', globalFilters.carrera);
     if (globalFilters.jornada) url.searchParams.append('jornada', globalFilters.jornada);
 
@@ -1170,6 +1271,7 @@ function navigateToDocente(nombre) {
 // --- TAB 3: DOCENTES ---
 function loadDocentes() {
     const url = new URL('/api/docentes', window.location.origin);
+    url.searchParams.append('_t', Date.now());
     if (globalFilters.carrera) url.searchParams.append('carrera', globalFilters.carrera);
     if (globalFilters.jornada) url.searchParams.append('jornada', globalFilters.jornada);
     
@@ -1252,6 +1354,7 @@ function selectDocente(docente) {
 
     // Fetch schedule for this teacher and render timetable
     const url = new URL('/api/schedule', window.location.origin);
+    url.searchParams.append('_t', Date.now());
     url.searchParams.append('docente', docente.DOCENTE);
     if (globalFilters.carrera) url.searchParams.append('carrera', globalFilters.carrera);
     if (globalFilters.jornada) url.searchParams.append('jornada', globalFilters.jornada);
@@ -1380,6 +1483,7 @@ function matchAndRenderDocenteProgramas(scheduleData) {
 // --- TAB 4: NIVELES ---
 function loadNivelSchedule(nivelStr) {
     const url = new URL('/api/schedule', window.location.origin);
+    url.searchParams.append('_t', Date.now());
     
     let displayTitle = '';
     if (nivelStr.includes('|')) {
@@ -1424,6 +1528,7 @@ function loadNivelSchedule(nivelStr) {
 // --- TAB 5: SALAS ---
 function loadSalas() {
     const url = new URL('/api/salas', window.location.origin);
+    url.searchParams.append('_t', Date.now());
     if (globalFilters.carrera) url.searchParams.append('carrera', globalFilters.carrera);
     if (globalFilters.jornada) url.searchParams.append('jornada', globalFilters.jornada);
     
@@ -1500,6 +1605,7 @@ function selectSala(sala) {
 
     // Fetch room schedule
     const url = new URL('/api/schedule', window.location.origin);
+    url.searchParams.append('_t', Date.now());
     url.searchParams.append('sala', sala.COD_SALON);
     if (globalFilters.carrera) url.searchParams.append('carrera', globalFilters.carrera);
     if (globalFilters.jornada) url.searchParams.append('jornada', globalFilters.jornada);
@@ -1570,8 +1676,18 @@ function renderTimetable(containerId, scheduleData, viewType) {
                         hash = subjectName.charCodeAt(i) + ((hash << 5) - hash);
                     }
                     const hue = Math.abs(hash % 360);
-                    const bgCol = `hsl(${hue}, 85%, 96%)`;
-                    const borderCol = `hsl(${hue}, 70%, 45%)`;
+                    let bgCol = `hsl(${hue}, 85%, 96%)`;
+                    let borderCol = `hsl(${hue}, 70%, 45%)`;
+                    
+                    if (viewType === 'alumno') {
+                        if (m.origen === 'SMP') {
+                            bgCol = 'rgba(43, 85, 204, 0.1)';
+                            borderCol = 'rgba(43, 85, 204, 0.9)';
+                        } else if (m.origen === 'MANUAL') {
+                            bgCol = 'rgba(22, 163, 74, 0.1)';
+                            borderCol = 'rgba(22, 163, 74, 0.9)';
+                        }
+                    }
                     
                     const typeClass = m.TIPO_HORARIO ? m.TIPO_HORARIO.toLowerCase() : 'teo';
                     
@@ -1612,6 +1728,12 @@ function renderTimetable(containerId, scheduleData, viewType) {
                         metaText = `
                             <div class="block-meta meta-docente" title="${m.DOCENTE}"><i class="fa-solid fa-user-tie"></i> ${m.DOCENTE}</div>
                             <div class="block-meta meta-nivel"><i class="fa-solid fa-layer-group"></i> Nivel ${m.NIVEL}</div>
+                        `;
+                    } else if (viewType === 'alumno') {
+                        // Display room and teacher for the student
+                        metaText = `
+                            <div class="block-meta meta-sala"><i class="fa-solid fa-door-open"></i> ${m.COD_SALON}</div>
+                            <div class="block-meta meta-docente" title="${m.DOCENTE}"><i class="fa-solid fa-user-tie"></i> ${m.DOCENTE}</div>
                         `;
                     }
                     
@@ -1896,6 +2018,7 @@ async function exportAllNivelesPDF() {
     
     for (const nivelVal of options) {
         const url = new URL('/api/schedule', window.location.origin);
+    url.searchParams.append('_t', Date.now());
         
         let n = nivelVal;
         let s = '';
@@ -2601,7 +2724,13 @@ document.getElementById('tc-rut')?.addEventListener('input', async (e) => {
                 div.addEventListener('click', () => {
                     document.getElementById('tc-rut').value = al.rut;
                     document.getElementById('tc-nombre').value = al.nombre;
+                    const mvRut = document.getElementById('mv-rut');
+                    if (mvRut) mvRut.value = al.rut;
+                    const mvNombre = document.getElementById('mv-nombre');
+                    if (mvNombre) mvNombre.value = al.nombre;
                     resultsDiv.style.display = 'none';
+                    // Trigger blur manually to load malla
+                    document.getElementById('tc-rut').dispatchEvent(new Event('blur'));
                 });
                 resultsDiv.appendChild(div);
             });
@@ -2674,7 +2803,17 @@ document.getElementById('tc-asignatura')?.addEventListener('change', (e) => {
             // Ordenar el combo para que quede igual que el orden de los tipos
             combo.sort((a, b) => (order[a.TIPO_HORARIO || 'TEO'] || 99) - (order[b.TIPO_HORARIO || 'TEO'] || 99));
             
-            let label = combo.map(n => `${n.NRC} (${n.TIPO_HORARIO || 'TEO'})`).join(' + ');
+            let label = combo.map(n => {
+                let days = [];
+                if (n.LUNES === 'Y') days.push('Lun');
+                if (n.MARTES === 'Y') days.push('Mar');
+                if (n.MIERCOLES === 'Y') days.push('Mié');
+                if (n.JUEVES === 'Y') days.push('Jue');
+                if (n.VIERNES === 'Y') days.push('Vie');
+                if (n.SABADO === 'Y') days.push('Sáb');
+                let scheduleStr = days.length > 0 && n.HORA_INCIO ? ` [${days.join(',')} ${n.HORA_INCIO}-${n.HORA_FIN}]` : '';
+                return `${n.NRC} (${n.TIPO_HORARIO || 'TEO'})${scheduleStr}`;
+            }).join(' + ');
             let value = combo.map(n => n.NRC).join(', ');
             let tipo = combo.map(n => n.TIPO_HORARIO || 'TEO').join(', ');
             
@@ -2820,11 +2959,14 @@ document.getElementById('btn-recomendar-ramos')?.addEventListener('click', async
                 
                 const validData = await validRes.json();
                 if (!validData.success) {
-                    const errorListHtml = '<ul style="text-align: left; font-size: 0.9rem;">' + 
-                        (validData.errors || [validData.message]).map(e => `<li style="margin-bottom:5px;">${e}</li>`).join('') + 
-                        '</ul>';
-                    Swal.showValidationMessage(`Existen conflictos entre las opciones seleccionadas o exceden el límite SCT:<br>${errorListHtml}`);
-                    return false;
+                    if (validData.errors && validData.errors.length > 0) {
+                        const errorListHtml = '<ul style="text-align: left; font-size: 0.9rem;">' + 
+                            validData.errors.map(e => `<li style="margin-bottom:5px;">${e}</li>`).join('') + 
+                            '</ul>';
+                        Swal.showValidationMessage(`Existen conflictos entre las opciones seleccionadas o exceden el límite SCT:<br>${errorListHtml}`);
+                        return false;
+                    }
+                    // If no strict errors, only warnings, we allow them to proceed since they already bypassed the prereq filter (which shouldn't happen here anyway).
                 }
                 
                 // 2. Save them sequentially
@@ -2923,18 +3065,44 @@ document.getElementById('toma-carga-form')?.addEventListener('submit', async (e)
             btn.innerHTML = ogText;
             btn.disabled = false;
             
-            // Build error list
-            const errorListHtml = '<ul style="text-align: left; font-size: 0.9rem;">' + 
-                (validData.errors || [validData.message]).map(e => `<li style="margin-bottom:5px;">${e}</li>`).join('') + 
-                '</ul>';
+            if (validData.errors && validData.errors.length > 0) {
+                const errorListHtml = '<ul style="text-align: left; font-size: 0.9rem;">' + 
+                    validData.errors.map(e => `<li style="margin-bottom:5px;">${e}</li>`).join('') + 
+                    '</ul>';
+                    
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Inscripción Rechazada',
+                    html: `<p>El estudiante no cumple con las reglas de inscripción:</p>${errorListHtml}`,
+                    confirmButtonColor: '#f59e0b'
+                });
+                return;
+            } else if (validData.warnings && validData.warnings.length > 0) {
+                const warningListHtml = '<ul style="text-align: left; font-size: 0.9rem;">' + 
+                    validData.warnings.map(e => `<li style="margin-bottom:5px;">${e}</li>`).join('') + 
+                    '</ul>';
+                    
+                const result = await Swal.fire({
+                    icon: 'warning',
+                    title: 'Advertencia Académica',
+                    html: `<p>Esta asignatura presenta observaciones:</p>${warningListHtml}<br><p>¿Deseas forzar la inscripción de todas formas?</p>`,
+                    showCancelButton: true,
+                    confirmButtonText: 'Sí, inscribir',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#10b981'
+                });
                 
-            Swal.fire({
-                icon: 'warning',
-                title: 'Inscripción Rechazada',
-                html: `<p>El estudiante no cumple con las reglas de inscripción:</p>${errorListHtml}`,
-                confirmButtonColor: '#f59e0b'
-            });
-            return;
+                if (!result.isConfirmed) {
+                    return;
+                }
+                
+                // If confirmed, proceed to save the inscription (skip returning)
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
+                btn.disabled = true;
+            } else {
+                Swal.fire('Error', validData.message || 'Error de validación', 'error');
+                return;
+            }
         }
         
         // 2. Save the inscription if validation passed
@@ -2956,10 +3124,12 @@ document.getElementById('toma-carga-form')?.addEventListener('submit', async (e)
                 timer: 3000,
                 showConfirmButton: false
             });
-            // Don't clear token on reset, so user can keep typing
-            const currentToken = document.getElementById('tc-smp-token').value;
-            document.getElementById('toma-carga-form').reset();
-            document.getElementById('tc-smp-token').value = currentToken;
+            // Solo limpiar los datos de la asignatura, mantener datos del estudiante (RUT, Nombre, Token)
+            document.getElementById('tc-asignatura').value = '';
+            document.getElementById('tc-nrc').innerHTML = '<option value="">Seleccione NRC...</option>';
+            document.getElementById('tc-tipo').value = '';
+            document.getElementById('tc-comentarios').value = '';
+            
             loadTomaCargaTable();
         } else {
             const err = await res.json();
@@ -2986,6 +3156,10 @@ async function loadTomaCargaTable() {
         
         rows.forEach(r => {
             const tr = document.createElement('tr');
+            tr.dataset.carrera = r.carrera || '';
+            tr.dataset.materia = r.materia || '';
+            tr.dataset.curso = r.curso || '';
+            tr.dataset.titulo = r.titulo_asig || r.asignatura;
             tr.innerHTML = `
                 <td>${r.rut}</td>
                 <td>${r.nombre}</td>
@@ -3026,41 +3200,34 @@ document.getElementById('btn-export-tc')?.addEventListener('click', () => {
     let csv = [];
     
     // Header
-    let headerCols = table.rows[0].querySelectorAll('th');
-    let headerRow = [];
-    for (let j = 0; j < headerCols.length - 1; j++) {
-        headerRow.push('"' + headerCols[j].innerText.replace(/"/g, '""') + '"');
-    }
-    csv.push(headerRow.join(';'));
+    csv.push('"CARRERA";"NOMBRE";"RUT";"ASIGNATURA";"NRC\'S"');
     
-    // Data Rows
-    for (let i = 1; i < table.rows.length; i++) {
-        let cols = table.rows[i].querySelectorAll('td');
+    // Data Rows (Reverse order: oldest first, newest at the bottom)
+    for (let i = table.rows.length - 1; i >= 1; i--) {
+        let tr = table.rows[i];
+        let cols = tr.querySelectorAll('td');
         if (cols.length <= 1) continue;
         
         let rut = cols[0].innerText;
         let nombre = cols[1].innerText;
-        let asig = cols[2].innerText;
         let nrcStr = cols[3].innerText;
-        let tipoStr = cols[4].innerText;
-        let comments = cols[5].innerText;
-        let date = cols[6].innerText;
         
-        let nrcs = nrcStr.split(',').map(s => s.trim());
-        let tipos = tipoStr.split(',').map(s => s.trim());
+        let carrera = tr.dataset.carrera || '';
+        let materia = tr.dataset.materia || '';
+        let curso = tr.dataset.curso || '';
+        let titulo = tr.dataset.titulo || cols[2].innerText;
         
-        for (let k = 0; k < nrcs.length; k++) {
-            let row = [
-                '"' + rut.replace(/"/g, '""') + '"',
-                '"' + nombre.replace(/"/g, '""') + '"',
-                '"' + asig.replace(/"/g, '""') + '"',
-                '"' + (nrcs[k] || '').replace(/"/g, '""') + '"',
-                '"' + (tipos[k] || '').replace(/"/g, '""') + '"',
-                '"' + comments.replace(/"/g, '""') + '"',
-                '"' + date.replace(/"/g, '""') + '"'
-            ];
-            csv.push(row.join(';'));
-        }
+        let asigFormatted = `${materia},${curso},${titulo}`;
+        let nrcsFormatted = nrcStr.split(',').map(s => s.trim()).join(',');
+        
+        let row = [
+            '"' + carrera.replace(/"/g, '""') + '"',
+            '"' + nombre.replace(/"/g, '""') + '"',
+            '"' + rut.replace(/"/g, '""') + '"',
+            '"' + asigFormatted.replace(/"/g, '""') + '"',
+            '"' + nrcsFormatted.replace(/"/g, '""') + '"'
+        ];
+        csv.push(row.join(';'));
     }
     
     // Download
@@ -3146,10 +3313,13 @@ function renderMalla(mallaVisual) {
         header.textContent = `Nivel ${parseFloat(nivel).toFixed(0)}`;
         col.appendChild(header);
         
-        // Subjects
         subjects.forEach(sub => {
             const card = document.createElement('div');
-            card.style.cssText = `padding: 12px; border-radius: 6px; font-size: 0.85rem; display: flex; flex-direction: column; gap: 5px; position: relative; min-height: 80px; ${styles[sub.estado]}`;
+            card.id = `malla-card-${sub.id_malla}`;
+            card.className = 'malla-card';
+            card.dataset.idMalla = sub.id_malla;
+            card.dataset.requisitos = JSON.stringify(sub.requisitos || []);
+            card.style.cssText = `padding: 12px; border-radius: 6px; font-size: 0.85rem; display: flex; flex-direction: column; gap: 5px; position: relative; min-height: 80px; z-index: 2; transition: all 0.2s; ${styles[sub.estado]}`;
             
             let extraInfo = `SCT: ${sub.sct}`;
             if (sub.estado === 'tope' && sub.motivo_bloqueo) {
@@ -3169,5 +3339,355 @@ function renderMalla(mallaVisual) {
         });
         
         container.appendChild(col);
+    }
+
+    // Setup SVG overlay for prerequisite lines
+    const svgOverlay = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svgOverlay.id = 'malla-lines-svg';
+    svgOverlay.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;';
+    
+    // Ensure container can hold absolute positioned svg
+    if (getComputedStyle(container).position === 'static') {
+        container.style.position = 'relative';
+    }
+    container.appendChild(svgOverlay);
+    
+    // Draw lines after a short delay to ensure DOM is fully laid out
+    setTimeout(() => {
+        drawPrerequisiteLines();
+        setupMallaHoverEffects();
+    }, 100);
+}
+
+function drawPrerequisiteLines() {
+    const svg = document.getElementById('malla-lines-svg');
+    const container = document.getElementById('malla-container');
+    if (!svg || !container) return;
+    
+    svg.innerHTML = ''; // clear existing lines
+    const containerRect = container.getBoundingClientRect();
+    
+    // Set SVG size to match scrollable area
+    svg.style.width = container.scrollWidth + 'px';
+    svg.style.height = container.scrollHeight + 'px';
+    
+    const cards = Array.from(document.querySelectorAll('.malla-card'));
+    
+    cards.forEach(card => {
+        const reqs = JSON.parse(card.dataset.requisitos || '[]');
+        const targetRect = card.getBoundingClientRect();
+        
+        reqs.forEach(reqId => {
+            const sourceCard = document.getElementById('malla-card-' + reqId);
+            if (sourceCard) {
+                const sourceRect = sourceCard.getBoundingClientRect();
+                
+                // Calculate relative coordinates including scroll offset
+                const startX = sourceRect.right - containerRect.left + container.scrollLeft;
+                const startY = sourceRect.top + (sourceRect.height / 2) - containerRect.top + container.scrollTop;
+                
+                const endX = targetRect.left - containerRect.left + container.scrollLeft;
+                const endY = targetRect.top + (targetRect.height / 2) - containerRect.top + container.scrollTop;
+                
+                // Draw Bezier curve
+                const controlX1 = startX + 50;
+                const controlX2 = endX - 50;
+                
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('d', `M ${startX} ${startY} C ${controlX1} ${startY}, ${controlX2} ${endY}, ${endX} ${endY}`);
+                path.setAttribute('fill', 'none');
+                path.setAttribute('stroke', '#cbd5e1');
+                path.setAttribute('stroke-width', '2');
+                path.setAttribute('opacity', '0.4');
+                path.dataset.source = reqId;
+                path.dataset.target = card.dataset.idMalla;
+                path.classList.add('prereq-line');
+                
+                svg.appendChild(path);
+            }
+        });
+    });
+}
+
+function setupMallaHoverEffects() {
+    const cards = document.querySelectorAll('.malla-card');
+    cards.forEach(card => {
+        card.addEventListener('mouseenter', () => {
+            const id = card.dataset.idMalla;
+            // Highlight card
+            card.style.transform = 'scale(1.02)';
+            card.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1)';
+            
+            // Highlight lines
+            document.querySelectorAll('.prereq-line').forEach(line => {
+                if (line.dataset.source === id) {
+                    // This card unlocks the target (Forward)
+                    line.setAttribute('stroke', '#f59e0b'); // amber
+                    line.setAttribute('stroke-width', '3');
+                    line.setAttribute('opacity', '1');
+                    const targetCard = document.getElementById('malla-card-' + line.dataset.target);
+                    if(targetCard) targetCard.style.boxShadow = '0 0 10px rgba(245, 158, 11, 0.5)';
+                } else if (line.dataset.target === id) {
+                    // This card requires the source (Backward)
+                    line.setAttribute('stroke', '#3b82f6'); // blue
+                    line.setAttribute('stroke-width', '3');
+                    line.setAttribute('opacity', '1');
+                    const sourceCard = document.getElementById('malla-card-' + line.dataset.source);
+                    if(sourceCard) sourceCard.style.boxShadow = '0 0 10px rgba(59, 130, 246, 0.5)';
+                } else {
+                    line.setAttribute('opacity', '0.1');
+                }
+            });
+        });
+        
+        card.addEventListener('mouseleave', () => {
+            card.style.transform = '';
+            card.style.boxShadow = '';
+            document.querySelectorAll('.prereq-line').forEach(line => {
+                line.setAttribute('stroke', '#cbd5e1');
+                line.setAttribute('stroke-width', '2');
+                line.setAttribute('opacity', '0.4');
+            });
+            cards.forEach(c => c.style.boxShadow = '');
+        });
+    });
+}
+
+window.addEventListener('resize', () => {
+    // Debounce resize
+    clearTimeout(window.mallaResizeTimer);
+    window.mallaResizeTimer = setTimeout(drawPrerequisiteLines, 200);
+});
+
+// Also bind scroll on the container to redraw if needed
+document.addEventListener('DOMContentLoaded', () => {
+    const container = document.getElementById('malla-container');
+    if (container) {
+        container.addEventListener('scroll', () => {
+            clearTimeout(window.mallaScrollTimer);
+            window.mallaScrollTimer = setTimeout(drawPrerequisiteLines, 50);
+        });
+    }
+});
+
+
+// --- HORARIO ALUMNO MODAL LOGIC ---
+document.getElementById('btn-close-horario-alumno')?.addEventListener('click', () => {
+    document.getElementById('alumno-horario-modal').style.display = 'none';
+});
+
+document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('#btn-ver-horario-alumno');
+    if (!btn) return;
+    
+    const rut = document.getElementById('tc-rut').value;
+    const token = document.getElementById('tc-smp-token').value;
+    
+    if (!rut) {
+        Swal.fire('Faltan Datos', 'Debes ingresar un RUT de estudiante.', 'warning');
+        return;
+    }
+    
+    Swal.fire({
+        title: 'Cargando Horario...',
+        html: '<div id="swal-step-text">Paso 1: Iniciando...</div>',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+    
+    const url = new URL('/api/alumnos/horario', window.location.origin);
+    url.searchParams.append('rut', rut);
+    if (token) url.searchParams.append('token', token);
+    
+    const currentNrc = document.getElementById('tc-nrc').value;
+    if (currentNrc) {
+        url.searchParams.append('preview_nrc', currentNrc);
+    }
+    
+    try {
+        const stepText = document.getElementById('swal-step-text');
+        if(stepText) stepText.innerText = 'Paso 2: Solicitando al servidor...';
+        
+        const res = await fetch(url);
+        
+        if(stepText) stepText.innerText = 'Paso 3: Analizando respuesta...';
+        const data = await res.json();
+        
+        if (data.success) {
+            if(stepText) stepText.innerText = 'Paso 4: Dibujando la malla...';
+            
+            setTimeout(() => {
+                try {
+                    document.getElementById('alumno-horario-modal').style.display = 'flex';
+                    document.getElementById('alumno-horario-modal').style.opacity = '1';
+                    document.getElementById('alumno-horario-modal').style.visibility = 'visible';
+                    document.getElementById('alumno-horario-modal').style.zIndex = '999999';
+                    
+                    renderTimetable('alumno-horario-container', data.schedule, 'alumno');
+                    Swal.close();
+                } catch(renderErr) {
+                    console.error(renderErr);
+                    Swal.fire('Error Render', renderErr.message, 'error');
+                }
+            }, 100);
+        } else {
+            Swal.fire('Error API', data.message || 'Error al cargar horario', 'error');
+        }
+    } catch(err) {
+        Swal.fire('Error Catch', err.message, 'error');
+    }
+});
+
+
+// Helper function to automatically load malla if ready
+window.tryLoadMalla = function() {
+    const rut = document.getElementById('mv-rut')?.value;
+    const token = document.getElementById('mv-token')?.value;
+    
+    if (rut && token) {
+        document.getElementById('btn-load-malla')?.click();
+    }
+};
+
+// Sync RUT and Token between Toma de Carga and Malla Visual
+document.addEventListener('DOMContentLoaded', () => {
+    const tcRut = document.getElementById('tc-rut');
+    const mvRut = document.getElementById('mv-rut');
+    const tcToken = document.getElementById('tc-smp-token');
+    const mvToken = document.getElementById('mv-token');
+    
+    if (tcRut && mvRut) {
+        tcRut.addEventListener('blur', async (e) => { 
+            const val = e.target.value.trim();
+            mvRut.value = val; 
+            
+            // Try to auto-fill name
+            const nombreInput = document.getElementById('tc-nombre');
+            if (val.length >= 3) {
+                try {
+                    const res = await fetch(`/api/alumnos/search?rut=${encodeURIComponent(val)}`);
+                    const data = await res.json();
+                    const exactMatch = data.find(al => al.rut.toLowerCase() === val.toLowerCase());
+                    if (exactMatch) {
+                        tcRut.value = exactMatch.rut;
+                        nombreInput.value = exactMatch.nombre;
+                        mvRut.value = exactMatch.rut;
+                        const mvNombre = document.getElementById('mv-nombre');
+                        if (mvNombre) mvNombre.value = exactMatch.nombre;
+                    } else if (data.length > 0) {
+                        tcRut.value = data[0].rut;
+                        nombreInput.value = data[0].nombre;
+                        mvRut.value = data[0].rut;
+                        const mvNombre = document.getElementById('mv-nombre');
+                        if (mvNombre) mvNombre.value = data[0].nombre;
+                    }
+                } catch(err) {
+                    console.error("Error auto-filling name:", err);
+                }
+            }
+            
+            tryLoadMalla(); 
+        });
+        mvRut.addEventListener('blur', (e) => { tcRut.value = e.target.value; tryLoadMalla(); });
+    }
+    
+    if (tcToken && mvToken) {
+        tcToken.addEventListener('input', (e) => { mvToken.value = e.target.value; tryLoadMalla(); });
+        mvToken.addEventListener('input', (e) => { tcToken.value = e.target.value; tryLoadMalla(); });
+    }
+});
+
+
+async function sendStudentScheduleEmail() {
+    const rut = document.getElementById('tc-rut').value;
+    const nombre = document.getElementById('tc-nombre').value;
+    
+    if (!rut || !nombre) {
+        showToast('Debe seleccionar un estudiante primero', 'error');
+        return;
+    }
+    
+    // Fetch email
+    let email = '';
+    try {
+        const res = await fetch(`/api/alumnos/search?rut=${encodeURIComponent(rut)}`);
+        const data = await res.json();
+        const exactMatch = data.find(al => al.rut.toLowerCase() === rut.toLowerCase());
+        if (exactMatch && exactMatch.correo) {
+            email = exactMatch.correo;
+        } else if (data.length > 0 && data[0].correo) {
+            email = data[0].correo;
+        }
+    } catch(err) {
+        console.error('Error fetching student email:', err);
+    }
+    
+    if (!email) {
+        showToast('No se encontró un correo para este estudiante.', 'warning');
+    } else {
+        try {
+            await copyToClipboard(email);
+            showToast(`Correo copiado al portapapeles: ${email}. Pégalo al destinatario.`, 'info');
+        } catch (e) {
+            console.log('No se pudo copiar el correo al portapapeles', e);
+        }
+    }
+    
+    if (typeof html2pdf === 'undefined') {
+        showToast('Error: Librería de PDF no cargada aún', 'error');
+        return;
+    }
+    
+    showToast('Generando PDF y abriendo gestor de correo...', 'success');
+    
+    const element = document.getElementById('alumno-horario-container');
+    
+    const rect = element.getBoundingClientRect();
+    const ratio = rect.height / rect.width;
+    const pdfWidth = 297; 
+    const pdfHeight = (pdfWidth * ratio) + 20; 
+    
+    const opt = {
+        margin:       10,
+        filename:     `Horario_${nombre.replace(/ /g, '_')}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true },
+        jsPDF:        { unit: 'mm', format: [pdfWidth, pdfHeight], orientation: 'portrait' }
+    };
+    
+    const saludo = `Estimado/a ${nombre},\n\nAdjunto encontrará su horario académico.`;
+    
+    try {
+        const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
+        const file = new File([pdfBlob], opt.filename, { type: 'application/pdf' });
+        
+        let filesToShare = [file];
+        
+        if (navigator.canShare && navigator.canShare({ files: filesToShare })) {
+            try {
+                await navigator.share({
+                    files: filesToShare,
+                    title: `Horario ${nombre}`,
+                    text: saludo
+                });
+                return;
+            } catch (shareError) {
+                console.log('User cancelled share or share failed', shareError);
+            }
+        }
+        
+        showToast('Descargando PDF... Por favor adjúntelo en su gestor de correo.', 'success');
+        html2pdf().set(opt).from(element).save();
+        
+        setTimeout(() => {
+            const mailtoLink = `mailto:${email}?subject=${encodeURIComponent('Horario Académico')}&body=${encodeURIComponent('Estimado/a ' + nombre + ',\n\nAdjunto su horario (por favor, añada el PDF descargado manualmete).\n\nSaludos.')}`;
+            window.open(mailtoLink, '_blank');
+        }, 1500);
+        
+    } catch (err) {
+        console.error('Error in sendStudentScheduleEmail:', err);
+        showToast('Ocurrió un error al generar el correo.', 'error');
     }
 }
